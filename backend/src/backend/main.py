@@ -1,11 +1,17 @@
 import logging
+from dotenv import load_dotenv, find_dotenv
+
+# Load environment variables from .env file
+load_dotenv(find_dotenv())
+
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.schemas import CheckRequest
 from backend.services.instagram import fetch_instagram_caption
-from backend.services.pipeline import detect_language, translate_stub, query_google_fact_check
+from backend.services.pipeline import detect_language, translate_stub
+from backend.services.factcheck import query_google_fact_check
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

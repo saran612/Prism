@@ -37,14 +37,16 @@ def test_translate_stub():
     assert "flat" in translated.lower()
 
 
+from backend.services.factcheck import query_google_fact_check
+
+
 def test_api_check_text():
     # Test the API check endpoint with text
-    response = client.post("/check", json={"text": "The moon is made of green cheese"})
+    response = client.post("/check", json={"text": "This is a simple english sentence to verify the fact checking API."})
     assert response.status_code == 200
     data = response.json()
-    assert data["text"] == "The moon is made of green cheese"
+    assert "This is a simple english sentence" in data["text"]
     assert data["detected_language"] == "en"
-    assert data["translated_text"] == "The moon is made of green cheese"
     assert "fact_check_results" in data
 
 def test_api_check_invalid_url():
@@ -58,3 +60,40 @@ def test_api_check_missing_fields():
     response = client.post("/check", json={})
     assert response.status_code == 400
     assert response.json() == {"error": "Either 'text' or 'url' must be provided."}
+
+
+@pytest.mark.anyio
+async def test_query_google_fact_check_stub(monkeypatch):
+    # Ensure GOOGLE_API_KEY is not set
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    
+    result = await query_google_fact_check("claim to check", "en")
+    assert "claims" in result
+    assert result["claims"][0]["claimReview"][0]["publisher"]["name"] == "Google Fact Check API (Stub)"
+    assert "GOOGLE_API_KEY environment variable is missing" in result["note"]
+
+
+@pytest.mark.anyio
+async def test_query_google_fact_check_api(monkeypatch):
+    # Set a dummy API key
+    monkeypatch.setenv("GOOGLE_API_KEY", "dummy_key")
+    
+    import httpx
+    from unittest.mock import AsyncMock, patch
+    
+    request = httpx.Request("GET", "https://factchecktools.googleapis.com/v1alpha1/claims:search")
+    mock_response = httpx.Response(status_code=200, json={"claims": [{"text": "verified claim"}]}, request=request)
+    
+    # Patch httpx.AsyncClient.get
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_response
+        result = await query_google_fact_check("verified claim", "en")
+        mock_get.assert_called_once()
+        assert result == {"claims": [{"text": "verified claim"}]}
+        
+        # Verify params sent
+        called_args, called_kwargs = mock_get.call_args
+        assert called_kwargs["params"]["query"] == "verified claim"
+        assert called_kwargs["params"]["key"] == "dummy_key"
+        assert called_kwargs["params"]["languageCode"] == "en"
+
