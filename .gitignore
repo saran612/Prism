@@ -155,3 +155,8 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Environments
+.env
+.env.*
+
