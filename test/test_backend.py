@@ -2,8 +2,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.main import app
-from backend.services.instagram import extract_instagram_shortcode
-from backend.services.pipeline import detect_language, translate_stub
+from backend.modules.social.services import extract_instagram_shortcode
+from backend.modules.translation.services import detect_language, translate_stub
+from backend.modules.factcheck.services import query_google_fact_check
 
 client = TestClient(app)
 
@@ -37,7 +38,6 @@ def test_translate_stub():
     assert "flat" in translated.lower()
 
 
-from backend.services.factcheck import query_google_fact_check
 
 
 def test_api_check_text():
