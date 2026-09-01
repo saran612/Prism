@@ -159,4 +159,5 @@ Thumbs.db
 # Environments
 .env
 .env.*
+!.env.example
 
