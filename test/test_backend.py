@@ -97,3 +97,13 @@ async def test_query_google_fact_check_api(monkeypatch):
         assert called_kwargs["params"]["key"] == "dummy_key"
         assert called_kwargs["params"]["languageCode"] == "en"
 
+
+def test_api_history():
+    response = client.get("/history")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) > 0
+    assert "input_text" in data[0]
+    assert "response_payload" not in data[0] or "created_at" in data[0]
+
