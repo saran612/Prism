@@ -1,39 +1,79 @@
 import re
 import logging
-import anyio
-import instaloader
+from typing import Dict, Any
+
+from backend.modules.social.instagram import (
+    extract_instagram_shortcode,
+    fetch_instagram_caption_sync,
+    fetch_instagram_caption,
+    fetch_instagram_post,
+)
+from backend.modules.social.twitter import (
+    extract_twitter_post_id,
+    fetch_twitter_post,
+)
+from backend.modules.social.facebook import (
+    extract_facebook_post_id,
+    fetch_facebook_post,
+)
 
 logger = logging.getLogger("prism.social")
 
 
-def extract_instagram_shortcode(url: str) -> str:
-    """Extracts shortcode from an Instagram post, reel, or TV URL."""
-    match = re.search(r'/(?:p|reel|tv)/([A-Za-z0-9-_]+)', url)
-    if match:
-        return match.group(1)
+def detect_platform(url: str) -> str:
+    """Detects social platform from URL."""
+    cleaned = url.lower()
+    if "instagram.com" in cleaned or "instagr.am" in cleaned:
+        return "instagram"
+    if "twitter.com" in cleaned or "x.com" in cleaned:
+        return "twitter"
+    if "facebook.com" in cleaned or "fb.com" in cleaned or "fb.watch" in cleaned:
+        return "facebook"
     
-    # Fallback: if it's already a clean shortcode (8 to 15 characters of base64url)
-    cleaned = url.strip().strip('/')
-    if '/' not in cleaned and 8 <= len(cleaned) <= 15:
-        return cleaned
+    # Fallback heuristics for shortcodes or numeric IDs
+    if re.fullmatch(r"[A-Za-z0-9-_]{8,15}", url.strip()):
+        return "instagram"
+    if re.fullmatch(r"\d{10,22}", url.strip()):
+        return "twitter"
+
+    return "unknown"
+
+
+async def fetch_social_post(url: str) -> Dict[str, Any]:
+    """Extracts post content, platform name, and ID across supported social networks."""
+    platform = detect_platform(url)
     
-    raise ValueError("Invalid Instagram URL format")
+    if platform == "instagram":
+        return await fetch_instagram_post(url)
+    elif platform == "twitter":
+        post_data = await fetch_twitter_post(url)
+        post_data["shortcode"] = post_data["post_id"]
+        return post_data
+    elif platform == "facebook":
+        post_data = await fetch_facebook_post(url)
+        post_data["shortcode"] = post_data["post_id"]
+        return post_data
+    else:
+        raise ValueError(f"Unsupported social media platform or invalid URL: {url}")
 
 
-def fetch_instagram_caption_sync(shortcode: str) -> str:
-    """Synchronous fetch of Instagram post caption using Instaloader."""
-    loader = instaloader.Instaloader()
-    post = instaloader.Post.from_shortcode(loader.context, shortcode)
-    return post.caption if post.caption else ""
+async def fetch_social_caption(url: str) -> str:
+    """Convenience helper to extract post caption string across Instagram, Twitter/X, and Facebook."""
+    result = await fetch_social_post(url)
+    return result.get("caption", "")
 
 
-async def fetch_instagram_caption(url: str) -> str:
-    """Asynchronously calls the sync Instaloader function in a threadpool."""
-    try:
-        shortcode = extract_instagram_shortcode(url)
-        # Run blocking Instaloader call in a thread pool to avoid blocking the event loop
-        caption = await anyio.to_thread.run_sync(fetch_instagram_caption_sync, shortcode)
-        return caption
-    except Exception as e:
-        logger.error(f"Error fetching Instagram post: {e}")
-        raise ValueError("could not fetch post content")
+# Re-exports for backward compatibility
+__all__ = [
+    "detect_platform",
+    "extract_instagram_shortcode",
+    "fetch_instagram_caption_sync",
+    "fetch_instagram_caption",
+    "fetch_instagram_post",
+    "extract_twitter_post_id",
+    "fetch_twitter_post",
+    "extract_facebook_post_id",
+    "fetch_facebook_post",
+    "fetch_social_post",
+    "fetch_social_caption",
+]

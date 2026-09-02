@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from typing import Optional
 
 
@@ -8,5 +8,8 @@ class ExtractCaptionRequest(BaseModel):
 
 class ExtractCaptionResponse(BaseModel):
     url: str
-    shortcode: str
+    platform: str
+    post_id: str
+    shortcode: Optional[str] = None
     caption: str
+    author: Optional[str] = None
