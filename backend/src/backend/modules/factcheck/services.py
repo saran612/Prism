@@ -5,7 +5,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
-from backend.modules.social.services import fetch_instagram_caption
+from backend.modules.social.services import fetch_social_caption
 from backend.modules.translation.services import detect_language, translate_to_english
 from backend.modules.factcheck.repository import FactCheckRepository
 from backend.modules.factcheck.schemas import CheckRequest
@@ -68,8 +68,8 @@ class FactCheckService:
     async def process_check(self, request: CheckRequest) -> dict:
         # Determine the text to check
         if request.url:
-            logger.info(f"Fetching Instagram post caption from: {request.url}")
-            text_to_check = await fetch_instagram_caption(request.url)
+            logger.info(f"Fetching social post caption from: {request.url}")
+            text_to_check = await fetch_social_caption(request.url)
         elif request.text:
             text_to_check = request.text
         else:
