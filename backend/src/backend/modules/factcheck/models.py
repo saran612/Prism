@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 from backend.core.database import Base
@@ -13,8 +13,8 @@ class FactCheckRecord(Base):
     input_text = Column(Text, nullable=False)
     detected_language = Column(String(10), nullable=True)
     translated_text = Column(Text, nullable=True)
-    fact_check_results = Column(JSONB, nullable=True)
-    response_payload = Column(JSONB, nullable=False)
+    fact_check_results = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    response_payload = Column(JSON().with_variant(JSONB, "postgresql"), nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.datetime.now(datetime.timezone.utc)

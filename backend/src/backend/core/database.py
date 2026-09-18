@@ -5,13 +5,39 @@ from backend.core.config import get_settings
 
 settings = get_settings()
 
-engine = create_engine(settings.DATABASE_URL)
+db_url = settings.DATABASE_URL
+connect_args = {}
+if db_url.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
+
+try:
+    engine = create_engine(db_url, connect_args=connect_args)
+    if not db_url.startswith("sqlite"):
+        with engine.connect() as conn:
+            pass
+except Exception:
+    db_url = "sqlite:///./prism.db"
+    connect_args = {"check_same_thread": False}
+    engine = create_engine(db_url, connect_args=connect_args)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
 
+def init_db():
+    try:
+        from backend.modules.factcheck import models  # noqa: F401
+        Base.metadata.create_all(bind=engine)
+    except Exception:
+        pass
+
+
+init_db()
+
+
 def get_db():
+    init_db()
     db = SessionLocal()
     try:
         yield db
