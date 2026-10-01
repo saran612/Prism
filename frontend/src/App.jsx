@@ -1,33 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
-const INDIAN_LANGUAGES = [
-  { code: 'hi', name: 'Hindi (हिन्दी)' },
-  { code: 'ta', name: 'Tamil (தமிழ்)' },
-  { code: 'te', name: 'Telugu (తెలుగు)' },
-  { code: 'bn', name: 'Bengali (বাংলা)' },
-  { code: 'mr', name: 'Marathi (मराठी)' },
-  { code: 'gu', name: 'Gujarati (ગુજરાતી)' },
-  { code: 'kn', name: 'Kannada (ಕನ್ನಡ)' },
-  { code: 'ml', name: 'Malayalam (മലയാളം)' },
-  { code: 'pa', name: 'Punjabi (ਪੰਜਾਬੀ)' },
-  { code: 'en', name: 'English' }
+const INDIC_LANGUAGES = [
+  { code: 'hi', name: 'Hindi', native: 'हिन्दी' },
+  { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
+  { code: 'te', name: 'Telugu', native: 'తెలుగు' },
+  { code: 'bn', name: 'Bengali', native: 'বাংলা' },
+  { code: 'mr', name: 'Marathi', native: 'मराठी' },
+  { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી' },
+  { code: 'kn', name: 'Kannada', native: 'ಕನ್ನಡ' },
+  { code: 'ml', name: 'Malayalam', native: 'മലയാളം' },
+  { code: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
+  { code: 'en', name: 'English', native: 'English' }
 ];
 
-const SAMPLE_CLAIMS = [
+const PRESET_SAMPLES = [
   {
     type: 'text',
-    label: 'Viral Moon Discovery (Hindi)',
+    label: 'Lunar Discovery (Hindi)',
     text: 'वैज्ञानिकों ने चंद्रमा के ध्रुवों पर नए जल बर्फ भंडार की खोज की।'
   },
   {
     type: 'text',
-    label: 'Claim: Fake Currency (English)',
+    label: 'Viral Currency Claim (English)',
     text: 'Government has announced that old 500 rupee notes will be banned from tomorrow.'
   },
   {
     type: 'url',
-    label: 'Twitter Post Sample',
+    label: 'NASA Space Mission (X / Twitter)',
     url: 'https://x.com/NASA/status/1894238573928172635'
   },
   {
@@ -38,52 +38,50 @@ const SAMPLE_CLAIMS = [
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('checker'); // 'checker' | 'translation' | 'history'
-  const [backendOnline, setBackendOnline] = useState(false);
-  const [backendVersion, setBackendVersion] = useState('0.1.0');
+  const [activeTab, setActiveTab] = useState('studio'); // 'studio' | 'lab' | 'history' | 'specs'
+  const [backendStatus, setBackendStatus] = useState({ online: false, version: '0.1.0' });
 
-  // Checker State
+  // Verification Studio State
   const [inputType, setInputType] = useState('text'); // 'text' | 'url'
-  const [textInput, setTextInput] = useState('');
-  const [urlInput, setUrlInput] = useState('');
+  const [claimText, setClaimText] = useState('');
+  const [claimUrl, setClaimUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [result, setResult] = useState(null);
+  const [verificationResult, setVerificationResult] = useState(null);
 
-  // Translation Sandbox State
-  const [transInput, setTransInput] = useState('');
-  const [detectedLang, setDetectedLang] = useState(null);
-  const [translatedText, setTranslatedText] = useState('');
-  const [transLoading, setTransLoading] = useState(false);
+  // Translation Lab State
+  const [labText, setLabText] = useState('');
+  const [labDetectedLang, setLabDetectedLang] = useState(null);
+  const [labTranslated, setLabTranslated] = useState('');
+  const [labLoading, setLabLoading] = useState(false);
 
-  // History State
+  // Audit History State
   const [historyItems, setHistoryItems] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyFilter, setHistoryFilter] = useState('');
+  const [historySearch, setHistorySearch] = useState('');
 
-  // Check backend health
+  // Ping Backend Health
   const checkHealth = async () => {
     try {
       const res = await fetch('/');
       if (res.ok) {
         const data = await res.json();
-        setBackendOnline(true);
-        if (data.version) setBackendVersion(data.version);
+        setBackendStatus({ online: true, version: data.version || '0.1.0' });
       } else {
-        setBackendOnline(false);
+        setBackendStatus((prev) => ({ ...prev, online: false }));
       }
     } catch {
-      setBackendOnline(false);
+      setBackendStatus((prev) => ({ ...prev, online: false }));
     }
   };
 
   useEffect(() => {
     checkHealth();
-    const interval = setInterval(checkHealth, 10000);
-    return () => clearInterval(interval);
+    const timer = setInterval(checkHealth, 8000);
+    return () => clearInterval(timer);
   }, []);
 
-  // Fetch History
+  // Fetch History on tab switch
   const fetchHistory = async () => {
     setHistoryLoading(true);
     try {
@@ -92,8 +90,8 @@ export default function App() {
         const data = await res.json();
         setHistoryItems(data);
       }
-    } catch (err) {
-      console.error('Failed to fetch history:', err);
+    } catch (e) {
+      console.error('History fetch failed:', e);
     } finally {
       setHistoryLoading(false);
     }
@@ -105,25 +103,25 @@ export default function App() {
     }
   }, [activeTab]);
 
-  // Handle Fact Check Submit
-  const handleCheck = async (e) => {
+  // Execute Fact Check
+  const handleVerify = async (e) => {
     if (e) e.preventDefault();
     setError(null);
-    setResult(null);
+    setVerificationResult(null);
 
     const payload = {};
     if (inputType === 'text') {
-      if (!textInput.trim()) {
-        setError('Please enter a claim statement or news caption to check.');
+      if (!claimText.trim()) {
+        setError('Please enter a claim statement or text to analyze.');
         return;
       }
-      payload.text = textInput.trim();
+      payload.text = claimText.trim();
     } else {
-      if (!urlInput.trim()) {
-        setError('Please enter a social media post URL.');
+      if (!claimUrl.trim()) {
+        setError('Please enter a valid social media URL (X, Instagram, Facebook).');
         return;
       }
-      payload.url = urlInput.trim();
+      payload.url = claimUrl.trim();
     }
 
     setLoading(true);
@@ -133,12 +131,11 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || data.detail || 'Verification request failed');
+        throw new Error(data.error || data.detail || 'Verification service encountered an error.');
       }
-      setResult(data);
+      setVerificationResult(data);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -146,593 +143,657 @@ export default function App() {
     }
   };
 
-  // Handle Translation Sandbox
-  const handleTranslateSandbox = async () => {
-    if (!transInput.trim()) return;
-    setTransLoading(true);
-    setDetectedLang(null);
-    setTranslatedText('');
+  // Run Translation Lab
+  const handleRunLab = async () => {
+    if (!labText.trim()) return;
+    setLabLoading(true);
+    setLabDetectedLang(null);
+    setLabTranslated('');
 
     try {
       const detRes = await fetch('/api/v1/translation/detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: transInput })
+        body: JSON.stringify({ text: labText })
       });
       const detData = await detRes.json();
-      setDetectedLang(detData.detected_language);
+      setLabDetectedLang(detData.detected_language);
 
       const transRes = await fetch('/api/v1/translation/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: transInput,
+          text: labText,
           source_language: detData.detected_language,
           target_language: 'en'
         })
       });
       const transData = await transRes.json();
-      setTranslatedText(transData.translated_text);
-    } catch (err) {
-      console.error(err);
+      setLabTranslated(transData.translated_text);
+    } catch (e) {
+      console.error(e);
     } finally {
-      setTransLoading(false);
+      setLabLoading(false);
     }
   };
 
-  // Helper to load sample
-  const applySample = (sample) => {
-    setInputType(sample.type);
-    if (sample.type === 'text') {
-      setTextInput(sample.text);
-    } else {
-      setUrlInput(sample.url);
-    }
+  const getLanguageMeta = (code) => {
+    if (!code) return { name: 'Unknown', native: '' };
+    const found = INDIC_LANGUAGES.find((l) => l.code === code.toLowerCase());
+    return found ? found : { name: code.toUpperCase(), native: '' };
   };
 
-  // Get Language Label
-  const getLanguageLabel = (code) => {
-    if (!code) return 'Unknown';
-    const found = INDIAN_LANGUAGES.find((l) => l.code === code.toLowerCase());
-    return found ? found.name : code.toUpperCase();
-  };
-
-  // Determine Verdict style
-  const getVerdictInfo = (results) => {
+  const computeVerdict = (results) => {
     if (!results || !results.claims || results.claims.length === 0) {
       return {
-        label: 'No Debunking Found / Unverified',
+        rating: 'Unverified / No Registry Match',
         type: 'unverified',
-        description: 'No prior fact checks matched this claim in the verification registry.'
+        description: 'No debunking records or registered fact checks matched this claim in official databases.'
       };
     }
 
-    const firstReview = results.claims[0]?.claimReview?.[0];
-    const rating = firstReview?.textualRating?.toLowerCase() || '';
+    const review = results.claims[0]?.claimReview?.[0];
+    const textRating = review?.textualRating || '';
+    const lower = textRating.toLowerCase();
 
-    if (rating.includes('false') || rating.includes('fake') || rating.includes('incorrect') || rating.includes('misleading') || rating.includes('debunked')) {
+    if (lower.includes('false') || lower.includes('fake') || lower.includes('debunk') || lower.includes('misleading') || lower.includes('incorrect')) {
       return {
-        label: 'Debunked / False Claim',
+        rating: textRating || 'Debunked / False',
         type: 'false',
-        description: `Flagged as: "${firstReview?.textualRating || 'False'}" by fact-checking organizations.`
+        description: `Flagged as false or misleading by verified fact-checking organizations.`
       };
-    } else if (rating.includes('true') || rating.includes('correct') || rating.includes('verified')) {
+    }
+
+    if (lower.includes('true') || lower.includes('correct') || lower.includes('accurate')) {
       return {
-        label: 'Verified True / Credible',
+        rating: textRating || 'Verified True',
         type: 'true',
-        description: `Verified by fact checkers as: "${firstReview?.textualRating}".`
+        description: `Corroborated as verified truth by credible fact checkers.`
       };
     }
 
     return {
-      label: firstReview?.textualRating || 'Claim Reviewed',
+      rating: textRating || 'Claim Reviewed',
       type: 'unverified',
-      description: `Rating: ${firstReview?.textualRating || 'Uncategorized'}`
+      description: `Rating recorded: "${textRating}".`
     };
   };
 
   return (
-    <div className="app-container">
-      {/* Header */}
-      <header className="app-header">
-        <div className="brand-wrapper">
-          <div className="brand-logo-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="12 2 2 7 12 12 22 7 12 2" />
-              <polyline points="2 17 12 22 22 17" />
-              <polyline points="2 12 12 17 22 12" />
-            </svg>
+    <div className="apple-app">
+      {/* Apple Frosted Navigation Bar */}
+      <nav className="apple-nav">
+        <div className="apple-nav-inner">
+          <div className="apple-brand" onClick={() => setActiveTab('studio')}>
+            <div className="apple-brand-icon">
+              {/* Apple-style Geometric Prism Emblem */}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 2 22 22 22" />
+                <line x1="12" y1="2" x2="12" y2="22" stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
+              </svg>
+            </div>
+            <span className="apple-brand-title">Prism</span>
+            <span className="apple-brand-pill">Intelligence</span>
           </div>
-          <div className="brand-text">
-            <h1>PRISM</h1>
-            <p>Real-Time Multi-Lingual Social Media Fact-Check Engine</p>
+
+          <div className="apple-nav-actions">
+            <div className={`apple-status-capsule ${backendStatus.online ? 'online' : 'offline'}`} id="backend-status-pill">
+              <span className="apple-status-indicator"></span>
+              <span>{backendStatus.online ? `Engine v${backendStatus.version}` : 'Connecting Engine...'}</span>
+            </div>
+
+            <a
+              href="/docs"
+              target="_blank"
+              rel="noreferrer"
+              className="apple-docs-btn"
+              id="apple-docs-link"
+            >
+              <span>API Specs</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M7 17l9.2-9.2M17 17V8H8" />
+              </svg>
+            </a>
           </div>
         </div>
-
-        <div className="header-actions">
-          <div className={`status-badge ${backendOnline ? 'online' : 'offline'}`} id="backend-status">
-            <span className="status-dot"></span>
-            <span>{backendOnline ? `API Live (v${backendVersion})` : 'Connecting to API...'}</span>
-          </div>
-          <a href="/docs" target="_blank" rel="noreferrer" className="docs-link" id="api-docs-link">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-            </svg>
-            API Docs
-          </a>
-        </div>
-      </header>
-
-      {/* Navigation Tabs */}
-      <nav className="nav-tabs" role="tablist">
-        <button
-          className={`nav-tab-btn ${activeTab === 'checker' ? 'active' : ''}`}
-          onClick={() => setActiveTab('checker')}
-          id="tab-checker"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-          Fact Checker
-        </button>
-
-        <button
-          className={`nav-tab-btn ${activeTab === 'translation' ? 'active' : ''}`}
-          onClick={() => setActiveTab('translation')}
-          id="tab-translation"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="m5 8 6 6" />
-            <path d="m4 14 6-6 2-3" />
-            <path d="M2 5h12" />
-            <path d="M7 2h1" />
-            <path d="m22 22-5-10-5 10" />
-            <path d="M14 18h6" />
-          </svg>
-          Translation Studio
-        </button>
-
-        <button
-          className={`nav-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
-          onClick={() => setActiveTab('history')}
-          id="tab-history"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
-          Verification History
-        </button>
       </nav>
 
-      {/* TAB 1: FACT CHECKER */}
-      {activeTab === 'checker' && (
-        <div className="animate-fade-in">
-          {/* Supported Languages */}
-          <div className="languages-banner">
-            <span className="lang-label">Supported Languages:</span>
-            {INDIAN_LANGUAGES.map((l) => (
-              <span key={l.code} className="lang-tag">
-                {l.name}
+      {/* Main Container */}
+      <main className="apple-main">
+        {/* Apple Hero Header */}
+        <header className="apple-hero">
+          <div className="apple-eyebrow">Prism Intelligence • Multi-Lingual Fact System</div>
+          <h1 className="apple-hero-title">Truth, in every tongue.</h1>
+          <p className="apple-hero-sub">
+            The real-time verification engine engineered for Indian social media streams. Instant language identification, neural translation, and multi-publisher credibility analysis.
+          </p>
+
+          {/* Indic Language Strip */}
+          <div className="apple-indic-strip">
+            {INDIC_LANGUAGES.map((l) => (
+              <span key={l.code} className="apple-indic-chip">
+                {l.native} • {l.name}
               </span>
             ))}
           </div>
+        </header>
 
-          <div className="prism-card">
-            {/* Input Type Switcher */}
-            <div className="input-switch">
-              <button
-                type="button"
-                className={`switch-pill ${inputType === 'text' ? 'active' : ''}`}
-                onClick={() => setInputType('text')}
-                id="switch-mode-text"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-                Claim Text / Headline
-              </button>
+        {/* Apple Segmented Control */}
+        <div className="apple-segmented-nav">
+          <div className="apple-segmented-container" role="tablist">
+            <button
+              className={`apple-segment-item ${activeTab === 'studio' ? 'active' : ''}`}
+              onClick={() => setActiveTab('studio')}
+              id="segment-studio"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              Verification Studio
+            </button>
 
-              <button
-                type="button"
-                className={`switch-pill ${inputType === 'url' ? 'active' : ''}`}
-                onClick={() => setInputType('url')}
-                id="switch-mode-url"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                </svg>
-                Social Media URL (X, Instagram, Facebook)
-              </button>
-            </div>
+            <button
+              className={`apple-segment-item ${activeTab === 'lab' ? 'active' : ''}`}
+              onClick={() => setActiveTab('lab')}
+              id="segment-lab"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m5 8 6 6" />
+                <path d="m4 14 6-6 2-3" />
+                <path d="M2 5h12" />
+                <path d="M7 2h1" />
+                <path d="m22 22-5-10-5 10" />
+                <path d="M14 18h6" />
+              </svg>
+              Translation Lab
+            </button>
 
-            {/* Quick Samples */}
-            <div className="samples-bar">
-              <span className="samples-title">Try Example:</span>
-              {SAMPLE_CLAIMS.map((s, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  className="sample-chip"
-                  onClick={() => applySample(s)}
-                  id={`sample-btn-${idx}`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
+            <button
+              className={`apple-segment-item ${activeTab === 'history' ? 'active' : ''}`}
+              onClick={() => setActiveTab('history')}
+              id="segment-history"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              Audit History
+            </button>
 
-            {/* Form */}
-            <form onSubmit={handleCheck}>
-              {inputType === 'text' ? (
-                <div className="input-group">
-                  <label className="input-label" htmlFor="claim-text-input">
-                    <span>Enter Claim or Social Post Text</span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)' }}>Auto-Detects Indian Languages</span>
-                  </label>
-                  <textarea
-                    id="claim-text-input"
-                    className="text-area"
-                    placeholder="Type or paste any claim text in Hindi, Tamil, Telugu, English or any supported language..."
-                    value={textInput}
-                    onChange={(e) => setTextInput(e.target.value)}
-                  />
-                </div>
-              ) : (
-                <div className="input-group">
-                  <label className="input-label" htmlFor="claim-url-input">
-                    <span>Paste Social Media Post URL</span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)' }}>Supports X / Twitter, Instagram & Facebook</span>
-                  </label>
-                  <input
-                    id="claim-url-input"
-                    type="url"
-                    className="text-input"
-                    placeholder="https://x.com/username/status/... or https://www.instagram.com/p/..."
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                  />
-                </div>
-              )}
-
-              {error && (
-                <div style={{ padding: '12px 16px', background: 'rgba(244, 63, 94, 0.1)', border: '1px solid rgba(244, 63, 94, 0.3)', borderRadius: 'var(--radius-sm)', color: '#fb7185', fontSize: '0.88rem', marginBottom: '16px' }}>
-                  {error}
-                </div>
-              )}
-
-              <div className="form-actions">
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={loading}
-                  id="btn-verify"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="12" y1="2" x2="12" y2="6" />
-                        <line x1="12" y1="18" x2="12" y2="22" />
-                        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76" />
-                        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07" />
-                        <line x1="2" y1="12" x2="6" y2="12" />
-                        <line x1="18" y1="12" x2="22" y2="12" />
-                        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24" />
-                        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93" />
-                      </svg>
-                      Verifying Claim...
-                    </>
-                  ) : (
-                    <>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="11" cy="11" r="8" />
-                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                      </svg>
-                      Verify Fact
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => {
-                    setTextInput('');
-                    setUrlInput('');
-                    setResult(null);
-                    setError(null);
-                  }}
-                  id="btn-clear"
-                >
-                  Clear
-                </button>
-              </div>
-            </form>
+            <button
+              className={`apple-segment-item ${activeTab === 'specs' ? 'active' : ''}`}
+              onClick={() => setActiveTab('specs')}
+              id="segment-specs"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+              Engine Specs
+            </button>
           </div>
+        </div>
 
-          {/* Results Display */}
-          {result && (
-            <div className="results-container animate-fade-in" id="factcheck-results">
-              {/* Verdict Header */}
-              {(() => {
-                const verdict = getVerdictInfo(result.fact_check_results);
-                return (
-                  <div className="verdict-header">
-                    <div className="verdict-meta">
-                      <h3>Verification Analysis</h3>
-                      <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-                        {verdict.description}
-                      </p>
-                    </div>
-                    <div className={`verdict-pill ${verdict.type}`}>
-                      <span>{verdict.label}</span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Language & Translation Compare */}
-              <div className="compare-grid">
-                <div className="compare-card">
-                  <div className="compare-header">
-                    <span>Input Content</span>
-                    <span className="lang-badge">
-                      {getLanguageLabel(result.detected_language)}
-                    </span>
-                  </div>
-                  <div className="compare-body">
-                    {result.text}
-                  </div>
+        {/* TAB 1: VERIFICATION STUDIO */}
+        {activeTab === 'studio' && (
+          <div className="apple-fade-in">
+            {/* Input Surface */}
+            <div className="apple-card">
+              <div className="apple-card-header">
+                <div className="apple-card-title-group">
+                  <h2>Verify Social Post or Claim</h2>
+                  <p>Paste any social URL or type a claim in Hindi, Tamil, Telugu, or English.</p>
                 </div>
 
-                <div className="compare-card">
-                  <div className="compare-header">
-                    <span>Standardized English Translation</span>
-                    <span className="lang-badge" style={{ background: 'rgba(99, 102, 241, 0.12)', color: 'var(--accent-primary)', borderColor: 'rgba(99, 102, 241, 0.3)' }}>
-                      EN Query
-                    </span>
-                  </div>
-                  <div className="compare-body">
-                    {result.translated_text || result.text}
-                  </div>
+                {/* Text vs URL switch */}
+                <div className="apple-input-picker">
+                  <button
+                    type="button"
+                    className={`apple-picker-btn ${inputType === 'text' ? 'active' : ''}`}
+                    onClick={() => setInputType('text')}
+                    id="picker-text"
+                  >
+                    Claim Text
+                  </button>
+                  <button
+                    type="button"
+                    className={`apple-picker-btn ${inputType === 'url' ? 'active' : ''}`}
+                    onClick={() => setInputType('url')}
+                    id="picker-url"
+                  >
+                    Social Media Link
+                  </button>
                 </div>
               </div>
 
-              {/* Matched Claims */}
-              <div className="claims-section">
-                <h4 className="section-title">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" />
-                    <line x1="16" y1="17" x2="8" y2="17" />
-                    <polyline points="10 9 9 9 8 9" />
-                  </svg>
-                  Fact Check Findings & Publisher Reviews
-                </h4>
+              {/* Sample Shortcuts */}
+              <div className="apple-samples-container">
+                <span className="apple-samples-label">Presets:</span>
+                {PRESET_SAMPLES.map((sample, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className="apple-sample-pill"
+                    onClick={() => {
+                      setInputType(sample.type);
+                      if (sample.type === 'text') setClaimText(sample.text);
+                      else setClaimUrl(sample.url);
+                    }}
+                    id={`preset-${idx}`}
+                  >
+                    {sample.label}
+                  </button>
+                ))}
+              </div>
 
-                {result.fact_check_results?.claims && result.fact_check_results.claims.length > 0 ? (
-                  result.fact_check_results.claims.map((claim, cIdx) => (
-                    <div key={cIdx} className="claim-item">
-                      <div className="claim-top">
-                        <div className="publisher-info">
-                          <span className="publisher-name">
-                            {claim.claimReview?.[0]?.publisher?.name || 'Fact Check Review'}
-                          </span>
-                          {claim.claimReview?.[0]?.publisher?.site && (
-                            <span className="publisher-site">
-                              ({claim.claimReview[0].publisher.site})
-                            </span>
-                          )}
-                        </div>
-                        {claim.claimReview?.[0]?.textualRating && (
-                          <span className={`rating-badge ${claim.claimReview[0].textualRating.toLowerCase().includes('false') ? 'false' : 'true'}`}>
-                            {claim.claimReview[0].textualRating}
-                          </span>
-                        )}
-                      </div>
+              {/* Form Input */}
+              <form onSubmit={handleVerify}>
+                <div className="apple-input-field-wrap">
+                  {inputType === 'text' ? (
+                    <textarea
+                      id="apple-claim-input"
+                      className="apple-textarea"
+                      placeholder="Type or paste any viral statement, news claim, or post caption in any Indian language..."
+                      value={claimText}
+                      onChange={(e) => setClaimText(e.target.value)}
+                    />
+                  ) : (
+                    <input
+                      id="apple-url-input"
+                      type="url"
+                      className="apple-input"
+                      placeholder="https://x.com/... or https://www.instagram.com/reel/... or https://facebook.com/..."
+                      value={claimUrl}
+                      onChange={(e) => setClaimUrl(e.target.value)}
+                    />
+                  )}
+                </div>
 
-                      <div className="claim-content-text">
-                        <strong>Claim Reviewed: </strong>
-                        {claim.text}
-                      </div>
-
-                      {claim.claimReview?.[0]?.title && (
-                        <div style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-                          <em>{claim.claimReview[0].title}</em>
-                        </div>
-                      )}
-
-                      <div className="claim-footer">
-                        <span>
-                          {claim.claimant ? `Claimant: ${claim.claimant}` : 'Social Media Stream'}
-                          {claim.claimReview?.[0]?.reviewDate && ` • ${new Date(claim.claimReview[0].reviewDate).toLocaleDateString()}`}
-                        </span>
-
-                        {claim.claimReview?.[0]?.url && (
-                          <a
-                            href={claim.claimReview[0].url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="article-link"
-                          >
-                            Read Full Fact Check
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                              <polyline points="15 3 21 3 21 9" />
-                              <line x1="10" y1="14" x2="21" y2="3" />
-                            </svg>
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="empty-state">
-                    <svg className="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                {error && (
+                  <div className="apple-error-banner" id="verification-error">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <circle cx="12" cy="12" r="10" />
                       <line x1="12" y1="8" x2="12" y2="12" />
                       <line x1="12" y1="16" x2="12.01" y2="16" />
                     </svg>
-                    <p style={{ fontWeight: 600 }}>No published fact checks found in registry</p>
-                    <p style={{ fontSize: '0.84rem', marginTop: '6px' }}>
-                      This claim does not have matching entries in the Google Fact Check Tools database.
-                    </p>
+                    <span>{error}</span>
                   </div>
                 )}
-              </div>
+
+                <div className="apple-action-bar">
+                  <button
+                    type="submit"
+                    className="apple-btn-primary"
+                    disabled={loading}
+                    id="btn-apple-verify"
+                  >
+                    {loading ? (
+                      <>
+                        <svg className="apple-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="16" />
+                        </svg>
+                        <span>Analyzing Credibility...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                        <span>Verify Claim</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="apple-btn-secondary"
+                    onClick={() => {
+                      setClaimText('');
+                      setClaimUrl('');
+                      setVerificationResult(null);
+                      setError(null);
+                    }}
+                    id="btn-apple-clear"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </form>
             </div>
-          )}
-        </div>
-      )}
 
-      {/* TAB 2: TRANSLATION STUDIO */}
-      {activeTab === 'translation' && (
-        <div className="animate-fade-in">
-          <div className="prism-card">
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '8px' }}>
-              Multi-Lingual Translation & Detection Sandbox
-            </h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '20px' }}>
-              Test Prism's internal language identification and machine translation pipeline directly.
-            </p>
+            {/* Results Inspection Surface */}
+            {verificationResult && (
+              <div className="apple-results apple-fade-in" id="apple-verification-results">
+                {/* Verdict Island */}
+                {(() => {
+                  const verdict = computeVerdict(verificationResult.fact_check_results);
+                  return (
+                    <div className={`apple-verdict-island ${verdict.type}`}>
+                      <div className="apple-verdict-info">
+                        <span className="apple-verdict-eyebrow">Verification Classification</span>
+                        <div className="apple-verdict-title">{verdict.rating}</div>
+                        <div className="apple-verdict-desc">{verdict.description}</div>
+                      </div>
 
-            <div className="input-group">
-              <label className="input-label" htmlFor="trans-input">
-                Indian Language Text Input
-              </label>
-              <textarea
-                id="trans-input"
-                className="text-area"
-                placeholder="Enter text in Hindi, Tamil, Telugu, Bengali, Kannada, Marathi, or Gujarati..."
-                value={transInput}
-                onChange={(e) => setTransInput(e.target.value)}
-              />
-            </div>
+                      <div className={`apple-verdict-badge ${verdict.type}`}>
+                        <span>{verdict.rating}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
-            <div className="form-actions" style={{ marginBottom: '24px' }}>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={handleTranslateSandbox}
-                disabled={transLoading || !transInput.trim()}
-                id="btn-run-translate"
-              >
-                {transLoading ? 'Processing...' : 'Detect & Translate to English'}
-              </button>
-            </div>
-
-            {(detectedLang || translatedText) && (
-              <div className="compare-grid animate-fade-in">
-                <div className="compare-card">
-                  <div className="compare-header">
-                    <span>Detected Language</span>
-                    <span className="lang-badge">{getLanguageLabel(detectedLang)} ({detectedLang})</span>
+                {/* Dual Pane Language & Translation */}
+                <div className="apple-dual-pane">
+                  <div className="apple-pane">
+                    <div className="apple-pane-header">
+                      <span>Source Query</span>
+                      <span className="apple-pane-badge">
+                        {getLanguageMeta(verificationResult.detected_language).native} (
+                        {getLanguageMeta(verificationResult.detected_language).name})
+                      </span>
+                    </div>
+                    <div className="apple-pane-text">
+                      {verificationResult.text}
+                    </div>
                   </div>
-                  <div className="compare-body">
-                    {transInput}
+
+                  <div className="apple-pane">
+                    <div className="apple-pane-header">
+                      <span>Neural English Representation</span>
+                      <span className="apple-pane-badge" style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#fff', borderColor: 'rgba(255, 255, 255, 0.15)' }}>
+                        Standardized EN
+                      </span>
+                    </div>
+                    <div className="apple-pane-text">
+                      {verificationResult.translated_text || verificationResult.text}
+                    </div>
                   </div>
                 </div>
 
-                <div className="compare-card">
-                  <div className="compare-header">
-                    <span>English Translation</span>
-                    <span className="lang-badge" style={{ background: 'rgba(99, 102, 241, 0.12)', color: 'var(--accent-primary)', borderColor: 'rgba(99, 102, 241, 0.3)' }}>Target: EN</span>
+                {/* Published Fact-Checks */}
+                <div className="apple-card">
+                  <div className="apple-card-header">
+                    <div className="apple-card-title-group">
+                      <h2>Registry Findings & Reviews</h2>
+                      <p>Authoritative debunking records retrieved from Google Fact Check Tools.</p>
+                    </div>
                   </div>
-                  <div className="compare-body">
-                    {translatedText || 'Translation empty'}
-                  </div>
+
+                  {verificationResult.fact_check_results?.claims && verificationResult.fact_check_results.claims.length > 0 ? (
+                    <div className="apple-findings-list">
+                      {verificationResult.fact_check_results.claims.map((claim, idx) => {
+                        const review = claim.claimReview?.[0];
+                        const isFalse = review?.textualRating?.toLowerCase().includes('false');
+                        return (
+                          <div key={idx} className="apple-finding-card">
+                            <div className="apple-finding-top">
+                              <div className="apple-publisher-name">
+                                {review?.publisher?.name || 'Fact Check Review'}
+                                {review?.publisher?.site && (
+                                  <span style={{ fontWeight: 400, color: 'var(--apple-label-tertiary)', marginLeft: '6px' }}>
+                                    ({review.publisher.site})
+                                  </span>
+                                )}
+                              </div>
+
+                              {review?.textualRating && (
+                                <span className={`apple-rating-pill ${isFalse ? 'false' : 'true'}`}>
+                                  {review.textualRating}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="apple-finding-body">
+                              <strong style={{ color: 'var(--apple-label-primary)' }}>Claim: </strong>
+                              {claim.text}
+                            </div>
+
+                            {review?.title && (
+                              <div style={{ fontSize: '0.86rem', color: 'var(--apple-label-secondary)' }}>
+                                <em>{review.title}</em>
+                              </div>
+                            )}
+
+                            <div className="apple-finding-footer">
+                              <span>
+                                {claim.claimant ? `Claimant: ${claim.claimant}` : 'Social Stream'}
+                                {review?.reviewDate && ` • ${new Date(review.reviewDate).toLocaleDateString()}`}
+                              </span>
+
+                              {review?.url && (
+                                <a
+                                  href={review.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="apple-safari-link"
+                                >
+                                  <span>Read Review in Safari</span>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                    <polyline points="15 3 21 3 21 9" />
+                                    <line x1="10" y1="14" x2="21" y2="3" />
+                                  </svg>
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--apple-label-secondary)' }}>
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4, margin: '0 auto 12px auto' }}>
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <div style={{ fontWeight: 600, color: 'var(--apple-label-primary)' }}>No Published Debunking Records Found</div>
+                      <div style={{ fontSize: '0.82rem', marginTop: '4px' }}>
+                        This statement has no indexed reviews in the verification database.
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* TAB 3: HISTORY */}
-      {activeTab === 'history' && (
-        <div className="animate-fade-in">
-          <div className="prism-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Verification Audit Log</h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  Persisted queries processed through Prism fact checking pipeline
-                </p>
+        {/* TAB 2: TRANSLATION LAB */}
+        {activeTab === 'lab' && (
+          <div className="apple-fade-in">
+            <div className="apple-card">
+              <div className="apple-card-header">
+                <div className="apple-card-title-group">
+                  <h2>Indic Language & Translation Lab</h2>
+                  <p>Direct access to Prism's neural script detection and machine translation pipeline.</p>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  placeholder="Filter records..."
-                  value={historyFilter}
-                  onChange={(e) => setHistoryFilter(e.target.value)}
-                  className="text-input"
-                  style={{ width: '220px', padding: '8px 12px', fontSize: '0.85rem' }}
+              <div className="apple-input-field-wrap">
+                <textarea
+                  id="apple-lab-input"
+                  className="apple-textarea"
+                  placeholder="Enter text in Hindi, Tamil, Telugu, Bengali, Kannada, Marathi, Gujarati, or Punjabi..."
+                  value={labText}
+                  onChange={(e) => setLabText(e.target.value)}
                 />
+              </div>
+
+              <div className="apple-action-bar" style={{ marginBottom: '24px' }}>
                 <button
                   type="button"
-                  className="btn-secondary"
-                  onClick={fetchHistory}
-                  disabled={historyLoading}
-                  style={{ padding: '8px 14px' }}
+                  className="apple-btn-primary"
+                  onClick={handleRunLab}
+                  disabled={labLoading || !labText.trim()}
+                  id="btn-apple-lab-run"
                 >
-                  ↻ Refresh
+                  {labLoading ? 'Processing Pipeline...' : 'Detect Script & Translate'}
                 </button>
               </div>
-            </div>
 
-            {historyLoading ? (
-              <div className="empty-state">
-                <p>Loading historical records...</p>
-              </div>
-            ) : historyItems.length === 0 ? (
-              <div className="empty-state">
-                <p>No verification history found yet.</p>
-                <p style={{ fontSize: '0.82rem', marginTop: '4px' }}>Run a fact check to see it recorded here.</p>
-              </div>
-            ) : (
-              <div className="history-list">
-                {historyItems
-                  .filter((item) =>
-                    !historyFilter ||
-                    (item.input_text && item.input_text.toLowerCase().includes(historyFilter.toLowerCase())) ||
-                    (item.translated_text && item.translated_text.toLowerCase().includes(historyFilter.toLowerCase()))
-                  )
-                  .map((item) => (
-                    <div
-                      key={item.id}
-                      className="history-card"
-                      onClick={() => {
-                        setActiveTab('checker');
-                        setResult({
-                          text: item.input_text,
-                          detected_language: item.detected_language || 'en',
-                          translated_text: item.translated_text || item.input_text,
-                          fact_check_results: item.fact_check_results || { claims: [] }
-                        });
-                      }}
-                    >
-                      <div className="history-info">
-                        <div className="history-text">{item.input_text}</div>
-                        <div className="history-sub">
-                          <span className="lang-badge" style={{ padding: '2px 8px', fontSize: '0.72rem' }}>
-                            {getLanguageLabel(item.detected_language)}
-                          </span>
-                          {item.source_url && <span>Source: {item.source_url}</span>}
-                          {item.created_at && <span>{new Date(item.created_at).toLocaleString()}</span>}
-                        </div>
-                      </div>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--accent-cyan)' }}>View &rarr;</span>
+              {(labDetectedLang || labTranslated) && (
+                <div className="apple-dual-pane apple-fade-in">
+                  <div className="apple-pane">
+                    <div className="apple-pane-header">
+                      <span>Detected Script</span>
+                      <span className="apple-pane-badge">
+                        {getLanguageMeta(labDetectedLang).native} ({getLanguageMeta(labDetectedLang).name})
+                      </span>
                     </div>
-                  ))}
-              </div>
-            )}
+                    <div className="apple-pane-text">{labText}</div>
+                  </div>
+
+                  <div className="apple-pane">
+                    <div className="apple-pane-header">
+                      <span>Neural English Translation</span>
+                      <span className="apple-pane-badge" style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#fff', borderColor: 'rgba(255, 255, 255, 0.15)' }}>
+                        Target: EN
+                      </span>
+                    </div>
+                    <div className="apple-pane-text">{labTranslated || 'Translating...'}</div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+        )}
+
+        {/* TAB 3: AUDIT HISTORY */}
+        {activeTab === 'history' && (
+          <div className="apple-fade-in">
+            <div className="apple-card">
+              <div className="apple-card-header">
+                <div className="apple-card-title-group">
+                  <h2>Verification Audit Log</h2>
+                  <p>Complete historical trace of verified claims and social extractions.</p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="Search records..."
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    className="apple-input"
+                    style={{ width: '200px', padding: '8px 14px', fontSize: '0.82rem' }}
+                  />
+                  <button
+                    type="button"
+                    className="apple-btn-secondary"
+                    onClick={fetchHistory}
+                    disabled={historyLoading}
+                    style={{ padding: '8px 14px' }}
+                  >
+                    ↻
+                  </button>
+                </div>
+              </div>
+
+              {historyLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--apple-label-secondary)' }}>
+                  Loading verification records...
+                </div>
+              ) : historyItems.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--apple-label-secondary)' }}>
+                  No historical records logged yet. Verify a claim in the Studio to record it.
+                </div>
+              ) : (
+                <div className="apple-history-list">
+                  {historyItems
+                    .filter((item) =>
+                      !historySearch ||
+                      item.input_text?.toLowerCase().includes(historySearch.toLowerCase()) ||
+                      item.translated_text?.toLowerCase().includes(historySearch.toLowerCase())
+                    )
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        className="apple-history-item"
+                        onClick={() => {
+                          setActiveTab('studio');
+                          setVerificationResult({
+                            text: item.input_text,
+                            detected_language: item.detected_language || 'en',
+                            translated_text: item.translated_text || item.input_text,
+                            fact_check_results: item.fact_check_results || { claims: [] }
+                          });
+                        }}
+                      >
+                        <div className="apple-history-content">
+                          <div className="apple-history-text">{item.input_text}</div>
+                          <div className="apple-history-meta">
+                            <span className="apple-pane-badge" style={{ padding: '2px 7px', fontSize: '0.68rem' }}>
+                              {getLanguageMeta(item.detected_language).name}
+                            </span>
+                            {item.source_url && <span>Source: {item.source_url}</span>}
+                            {item.created_at && <span>{new Date(item.created_at).toLocaleString()}</span>}
+                          </div>
+                        </div>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--apple-label-tertiary)' }}>
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: ENGINE SPECS */}
+        {activeTab === 'specs' && (
+          <div className="apple-fade-in">
+            <div className="apple-specs-grid">
+              <div className="apple-spec-box">
+                <div className="apple-spec-number">10+</div>
+                <div className="apple-spec-title">Indian Languages</div>
+                <div className="apple-spec-desc">
+                  Native support for Hindi, Tamil, Telugu, Bengali, Marathi, Gujarati, Kannada, Malayalam, Punjabi, and English.
+                </div>
+              </div>
+
+              <div className="apple-spec-box">
+                <div className="apple-spec-number">&lt;200ms</div>
+                <div className="apple-spec-title">Language Inference</div>
+                <div className="apple-spec-desc">
+                  Sub-second script identification using character n-gram profiles and statistical language models.
+                </div>
+              </div>
+
+              <div className="apple-spec-box">
+                <div className="apple-spec-number">3 Platforms</div>
+                <div className="apple-spec-title">Social Extraction</div>
+                <div className="apple-spec-desc">
+                  Automated caption, post ID, and author extraction for X / Twitter, Instagram Reels, and Facebook Shares.
+                </div>
+              </div>
+
+              <div className="apple-spec-box">
+                <div className="apple-spec-number">Global</div>
+                <div className="apple-spec-title">Fact Check Registry</div>
+                <div className="apple-spec-desc">
+                  Direct integration with Google Fact Check Tools API aggregating reviews from certified global and Indian fact checkers.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Apple Footer */}
+      <footer className="apple-footer">
+        <div>Prism Intelligence Platform • Precision Fact Verification for Indic Social Media</div>
+        <div style={{ marginTop: '6px' }}>
+          <a href="/docs" target="_blank" rel="noreferrer">OpenAPI Documentation</a>
+          •
+          <a href="https://github.com/saran612/Prism" target="_blank" rel="noreferrer">Repository</a>
+          •
+          <span>Built for Truth & Integrity</span>
         </div>
-      )}
+      </footer>
     </div>
   );
 }
