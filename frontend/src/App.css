@@ -141,16 +141,7 @@
 /* Hero Section */
 .apple-hero {
   text-align: center;
-  margin-bottom: 40px;
-}
-
-.apple-eyebrow {
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-weight: 700;
-  color: var(--apple-blue);
-  margin-bottom: 12px;
+  margin-bottom: 32px;
 }
 
 .apple-hero-title {
@@ -161,7 +152,7 @@
   background: linear-gradient(180deg, #ffffff 15%, #a1a1a6 90%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  margin-bottom: 14px;
+  margin-bottom: 0;
 }
 
 .apple-hero-sub {

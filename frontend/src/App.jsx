@@ -297,27 +297,7 @@ console.log("Fact Check Results:", data.fact_check_results);`;
       <main className="apple-main">
         {/* Apple Hero Header */}
         <header className="apple-hero">
-          <div className="apple-eyebrow">Real-Time Social Media Fact-Checking API</div>
           <h1 className="apple-hero-title">Verify any social link.</h1>
-          <p className="apple-hero-sub">
-            Paste an X (Twitter), Instagram, or Facebook post URL. Prism extracts the caption, identifies Indian languages, translates to English, and queries fact-checking registries via a single API call.
-          </p>
-
-          {/* Social Platforms Supported */}
-          <div className="apple-platforms-strip">
-            <div className="apple-platform-badge twitter">
-              <span>𝕏</span>
-              <span>X / Twitter Posts</span>
-            </div>
-            <div className="apple-platform-badge instagram">
-              <span>📸</span>
-              <span>Instagram Reels & Posts</span>
-            </div>
-            <div className="apple-platform-badge facebook">
-              <span>👥</span>
-              <span>Facebook Public Posts</span>
-            </div>
-          </div>
         </header>
 
         {/* Apple Segmented Control */}
