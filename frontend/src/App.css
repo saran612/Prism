@@ -90,14 +90,14 @@
 .apple-theme-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
   border-radius: var(--radius-full);
   background: var(--apple-chip-bg);
   border: 1px solid var(--apple-border-light);
-  font-size: 0.78rem;
   color: var(--apple-label-secondary);
-  font-weight: 600;
   transition: all 0.2s var(--ease-apple);
 }
 
@@ -105,6 +105,7 @@
   background: var(--apple-chip-hover);
   color: var(--apple-label-primary);
   border-color: var(--apple-border);
+  transform: scale(1.06);
 }
 
 .apple-status-capsule {
