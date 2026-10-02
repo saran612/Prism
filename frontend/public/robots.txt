@@ -1,0 +1,9 @@
+# Prism Robots.txt Routing Policy
+User-agent: *
+Allow: /
+Allow: /api-studio
+Allow: /history
+Allow: /vercel
+Disallow: /api/
+
+Sitemap: https://prism.internal/sitemap.xml
