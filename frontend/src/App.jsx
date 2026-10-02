@@ -49,6 +49,16 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('verifier'); // 'verifier' | 'api-studio' | 'history'
   const [backendStatus, setBackendStatus] = useState({ online: false, version: '0.1.0' });
 
+  // Theme State ('dark' | 'light')
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('prism_theme') || 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('prism_theme', theme);
+  }, [theme]);
+
   // Main Social Link State
   const [socialUrl, setSocialUrl] = useState('https://x.com/jack/status/20');
   const [loading, setLoading] = useState(false);
@@ -272,6 +282,38 @@ console.log("Fact Check Results:", data.fact_check_results);`;
           </div>
 
           <div className="apple-nav-actions">
+            <button
+              type="button"
+              className="apple-theme-toggle"
+              onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+              id="theme-toggle-btn"
+            >
+              {theme === 'dark' ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                  </svg>
+                  <span>Light</span>
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                  <span>Dark</span>
+                </>
+              )}
+            </button>
+
             <div className={`apple-status-capsule ${backendStatus.online ? 'online' : 'offline'}`} id="backend-status-pill">
               <span className="apple-status-indicator"></span>
               <span>{backendStatus.online ? `API Live (v${backendStatus.version})` : 'Connecting API...'}</span>

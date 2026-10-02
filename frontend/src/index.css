@@ -1,5 +1,6 @@
 /* Apple Design System Tokens & Base Foundation */
-:root {
+:root,
+[data-theme="dark"] {
   --sf-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", -apple-system-body, system-ui, sans-serif;
   --sf-mono: "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
 
@@ -12,6 +13,9 @@
   --apple-surface-glass-elevated: rgba(44, 44, 46, 0.65);
   --apple-glass-hover: rgba(58, 58, 60, 0.5);
 
+  --apple-nav-bg: rgba(0, 0, 0, 0.78);
+  --apple-nav-border: rgba(255, 255, 255, 0.08);
+
   /* Apple Text Hierarchy */
   --apple-label-primary: #f5f5f7;
   --apple-label-secondary: #86868b;
@@ -21,13 +25,9 @@
   /* Apple System Colors */
   --apple-blue: #2997ff;
   --apple-blue-hover: #0077ed;
-  --apple-blue-rgb: 41, 151, 255;
   --apple-green: #30d158;
-  --apple-green-rgb: 48, 209, 88;
   --apple-orange: #ff9f0a;
-  --apple-orange-rgb: 255, 159, 10;
   --apple-red: #ff453a;
-  --apple-red-rgb: 255, 69, 58;
   --apple-purple: #bf5af2;
   --apple-indigo: #5e5ce6;
   --apple-cyan: #64d2ff;
@@ -36,6 +36,22 @@
   --apple-border: rgba(255, 255, 255, 0.12);
   --apple-border-light: rgba(255, 255, 255, 0.08);
   --apple-border-focus: rgba(41, 151, 255, 0.6);
+
+  /* Element Backgrounds */
+  --apple-spotlight-bg: rgba(18, 18, 20, 0.85);
+  --apple-pane-bg: rgba(28, 28, 30, 0.55);
+  --apple-card-sub-bg: rgba(28, 28, 30, 0.5);
+  --apple-chip-bg: rgba(255, 255, 255, 0.05);
+  --apple-chip-hover: rgba(255, 255, 255, 0.1);
+  --apple-segmented-bg: rgba(28, 28, 30, 0.7);
+  --apple-segmented-active-bg: rgba(68, 68, 70, 0.75);
+  --apple-segmented-active-color: #ffffff;
+  --apple-segmented-active-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  --apple-title-gradient: linear-gradient(180deg, #ffffff 15%, #a1a1a6 90%);
+  --apple-brand-title-gradient: linear-gradient(180deg, #ffffff 30%, #a1a1a6 100%);
+  --apple-scrollbar-thumb: rgba(255, 255, 255, 0.16);
+  --apple-scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+  --apple-ambient-glow: radial-gradient(circle, rgba(41, 151, 255, 0.12) 0%, rgba(191, 90, 242, 0.08) 45%, transparent 70%);
 
   /* Apple Radii */
   --radius-xs: 8px;
@@ -49,13 +65,61 @@
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.45);
-  --shadow-glow-blue: 0 0 30px rgba(41, 151, 255, 0.25);
-  --shadow-glow-green: 0 0 30px rgba(48, 209, 88, 0.25);
-  --shadow-glow-red: 0 0 30px rgba(255, 69, 58, 0.25);
 
   /* Animation Easing */
   --ease-apple: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.15);
+}
+
+/* Apple Cupertino Light Theme Palette */
+[data-theme="light"] {
+  --apple-bg: #f5f5f7;
+  --apple-surface-1: #ffffff;
+  --apple-surface-2: #ffffff;
+  --apple-surface-3: #e8e8ed;
+  --apple-surface-glass: rgba(255, 255, 255, 0.82);
+  --apple-surface-glass-elevated: rgba(255, 255, 255, 0.95);
+  --apple-glass-hover: rgba(240, 240, 245, 0.9);
+
+  --apple-nav-bg: rgba(245, 245, 247, 0.82);
+  --apple-nav-border: rgba(0, 0, 0, 0.08);
+
+  --apple-label-primary: #1d1d1f;
+  --apple-label-secondary: #86868b;
+  --apple-label-tertiary: #6e6e73;
+  --apple-label-quaternary: #aeaeb2;
+
+  --apple-blue: #0071e3;
+  --apple-blue-hover: #0077ed;
+  --apple-green: #34c759;
+  --apple-orange: #ff9500;
+  --apple-red: #ff3b30;
+  --apple-purple: #af52de;
+  --apple-indigo: #5856d6;
+  --apple-cyan: #30b0c7;
+
+  --apple-border: rgba(0, 0, 0, 0.1);
+  --apple-border-light: rgba(0, 0, 0, 0.06);
+  --apple-border-focus: rgba(0, 113, 227, 0.5);
+
+  --apple-spotlight-bg: #ffffff;
+  --apple-pane-bg: rgba(255, 255, 255, 0.75);
+  --apple-card-sub-bg: rgba(255, 255, 255, 0.8);
+  --apple-chip-bg: rgba(0, 0, 0, 0.05);
+  --apple-chip-hover: rgba(0, 0, 0, 0.09);
+  --apple-segmented-bg: rgba(0, 0, 0, 0.06);
+  --apple-segmented-active-bg: #ffffff;
+  --apple-segmented-active-color: #1d1d1f;
+  --apple-segmented-active-shadow: 0 2px 6px rgba(0, 0, 0, 0.1), 0 1px 1px rgba(0, 0, 0, 0.04);
+  --apple-title-gradient: linear-gradient(180deg, #1d1d1f 30%, #48484a 100%);
+  --apple-brand-title-gradient: linear-gradient(180deg, #1d1d1f 30%, #48484a 100%);
+  --apple-scrollbar-thumb: rgba(0, 0, 0, 0.16);
+  --apple-scrollbar-thumb-hover: rgba(0, 0, 0, 0.28);
+  --apple-ambient-glow: radial-gradient(circle, rgba(0, 113, 227, 0.08) 0%, rgba(175, 82, 222, 0.05) 45%, transparent 70%);
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.08);
 }
 
 *, *::before, *::after {
@@ -79,6 +143,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
   position: relative;
+  transition: background-color 0.3s var(--ease-apple), color 0.3s var(--ease-apple);
 }
 
 /* Apple Subdued Ambient Glow in Background */
@@ -90,10 +155,11 @@ body::before {
   transform: translateX(-50%);
   width: 900px;
   height: 500px;
-  background: radial-gradient(circle, rgba(41, 151, 255, 0.12) 0%, rgba(191, 90, 242, 0.08) 45%, transparent 70%);
+  background: var(--apple-ambient-glow);
   pointer-events: none;
   z-index: 0;
   filter: blur(80px);
+  transition: background 0.4s var(--ease-apple);
 }
 
 /* Smooth Apple Scrollbar */
@@ -105,14 +171,14 @@ body::before {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--apple-scrollbar-thumb);
   border-radius: var(--radius-full);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: var(--apple-scrollbar-thumb-hover);
 }
 
-button, input, textarea {
+button, input, textarea, select {
   font-family: inherit;
   color: inherit;
   border: none;
