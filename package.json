@@ -1,0 +1,12 @@
+{
+  "name": "prism",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "install": "npm --prefix frontend install",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build"
+  }
+}
