@@ -121,6 +121,18 @@ async def fetch_facebook_post(url: str) -> Dict[str, Any]:
             if title_match:
                 author = html.unescape(title_match.group(1))
 
+            # 3. Look for og:image
+            image_match = re.search(
+                r'<meta\s+(?:property|name)=["\']og:image["\']\s+content=["\'](.*?)["\']',
+                html_content,
+                re.DOTALL | re.IGNORECASE
+            ) or re.search(
+                r'<meta\s+content=["\'](.*?)["\']\s+(?:property|name)=["\']og:image["\']',
+                html_content,
+                re.DOTALL | re.IGNORECASE
+            )
+            thumbnail_url = html.unescape(image_match.group(1)) if image_match else None
+
             cleaned_caption = _clean_facebook_caption(caption)
             if not cleaned_caption and author and not _clean_facebook_caption(author).startswith("Facebook"):
                 cleaned_caption = _clean_facebook_caption(author)
@@ -130,7 +142,8 @@ async def fetch_facebook_post(url: str) -> Dict[str, Any]:
                     "post_id": post_id,
                     "platform": "facebook",
                     "author": author,
-                    "caption": cleaned_caption
+                    "caption": cleaned_caption,
+                    "thumbnail_url": thumbnail_url
                 }
 
     except Exception as e:

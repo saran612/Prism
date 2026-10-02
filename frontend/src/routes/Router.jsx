@@ -50,11 +50,7 @@ export function RouterProvider({ children }) {
 
   // Sync document.title
   useEffect(() => {
-    if (activeRoute) {
-      document.title = `${activeRoute.title} — Prism`;
-    } else {
-      document.title = 'Page Not Found — Prism';
-    }
+    document.title = 'Prism';
   }, [activeRoute, currentPath]);
 
   const value = {
@@ -167,7 +163,7 @@ export function NotFoundPage({ currentPath: propPath, onNavigate }) {
         Lost in the Spectrum.
       </h1>
       <p style={{ color: 'var(--apple-label-secondary)', fontSize: '1rem', lineHeight: 1.6, marginBottom: '24px' }}>
-        The requested path <code style={{ fontFamily: 'var(--sf-mono)', background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '6px', color: '#ff453a' }}>{path}</code> does not match any registered client route or Vercel edge rewrite schema.
+        The requested path <code style={{ fontFamily: 'var(--sf-mono)', background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: '6px', color: '#ff453a' }}>{path}</code> does not match any registered client route.
       </p>
 
       <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '36px' }}>
@@ -177,13 +173,6 @@ export function NotFoundPage({ currentPath: propPath, onNavigate }) {
           onClick={() => nav('/')}
         >
           Return to Verifier
-        </button>
-        <button
-          type="button"
-          className="apple-btn-secondary"
-          onClick={() => nav('/vercel')}
-        >
-          View Vercel Schemas
         </button>
       </div>
 

@@ -1,94 +1,28 @@
 /* Apple Design System Tokens & Base Foundation */
 :root,
-[data-theme="dark"] {
-  --sf-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", -apple-system-body, system-ui, sans-serif;
+[data-theme="light"] {
+  --sf-font: Geist, Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   --sf-mono: "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
 
-  /* Apple Pro Dark Theme Palette */
-  --apple-bg: #000000;
-  --apple-surface-1: #161617;
-  --apple-surface-2: #1c1c1e;
-  --apple-surface-3: #2c2c2e;
-  --apple-surface-glass: rgba(28, 28, 30, 0.72);
-  --apple-surface-glass-elevated: rgba(44, 44, 46, 0.65);
-  --apple-glass-hover: rgba(58, 58, 60, 0.5);
-
-  --apple-nav-bg: rgba(0, 0, 0, 0.78);
-  --apple-nav-border: rgba(255, 255, 255, 0.08);
-
-  /* Apple Text Hierarchy */
-  --apple-label-primary: #f5f5f7;
-  --apple-label-secondary: #86868b;
-  --apple-label-tertiary: #6e6e73;
-  --apple-label-quaternary: #48484a;
-
-  /* Apple System Colors */
-  --apple-blue: #2997ff;
-  --apple-blue-hover: #0077ed;
-  --apple-green: #30d158;
-  --apple-orange: #ff9f0a;
-  --apple-red: #ff453a;
-  --apple-purple: #bf5af2;
-  --apple-indigo: #5e5ce6;
-  --apple-cyan: #64d2ff;
-
-  /* Apple Glass & Borders */
-  --apple-border: rgba(255, 255, 255, 0.12);
-  --apple-border-light: rgba(255, 255, 255, 0.08);
-  --apple-border-focus: rgba(41, 151, 255, 0.6);
-
-  /* Element Backgrounds */
-  --apple-spotlight-bg: rgba(18, 18, 20, 0.85);
-  --apple-pane-bg: rgba(28, 28, 30, 0.55);
-  --apple-card-sub-bg: rgba(28, 28, 30, 0.5);
-  --apple-chip-bg: rgba(255, 255, 255, 0.05);
-  --apple-chip-hover: rgba(255, 255, 255, 0.1);
-  --apple-segmented-bg: rgba(28, 28, 30, 0.7);
-  --apple-segmented-active-bg: rgba(68, 68, 70, 0.75);
-  --apple-segmented-active-color: #ffffff;
-  --apple-segmented-active-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  --apple-title-gradient: linear-gradient(180deg, #ffffff 15%, #a1a1a6 90%);
-  --apple-brand-title-gradient: linear-gradient(180deg, #ffffff 30%, #a1a1a6 100%);
-  --apple-scrollbar-thumb: rgba(255, 255, 255, 0.16);
-  --apple-scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
-  --apple-ambient-glow: radial-gradient(circle, rgba(41, 151, 255, 0.12) 0%, rgba(191, 90, 242, 0.08) 45%, transparent 70%);
-
-  /* Apple Radii */
-  --radius-xs: 8px;
-  --radius-sm: 12px;
-  --radius-md: 18px;
-  --radius-lg: 24px;
-  --radius-xl: 32px;
-  --radius-full: 9999px;
-
-  /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.45);
-
-  /* Animation Easing */
-  --ease-apple: cubic-bezier(0.25, 1, 0.5, 1);
-  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.15);
-}
-
-/* Apple Cupertino Light Theme Palette */
-[data-theme="light"] {
-  --apple-bg: #f5f5f7;
+  /* Apple Cupertino Light Theme Palette with Warm #f5f5f0 Base */
+  --apple-bg: #f5f5f0;
   --apple-surface-1: #ffffff;
   --apple-surface-2: #ffffff;
-  --apple-surface-3: #e8e8ed;
+  --apple-surface-3: #e8e8e3;
   --apple-surface-glass: rgba(255, 255, 255, 0.82);
   --apple-surface-glass-elevated: rgba(255, 255, 255, 0.95);
-  --apple-glass-hover: rgba(240, 240, 245, 0.9);
+  --apple-glass-hover: rgba(238, 238, 233, 0.9);
 
-  --apple-nav-bg: rgba(245, 245, 247, 0.82);
+  --apple-nav-bg: rgba(245, 245, 240, 0.85);
   --apple-nav-border: rgba(0, 0, 0, 0.08);
 
+  /* Apple Text Hierarchy */
   --apple-label-primary: #1d1d1f;
   --apple-label-secondary: #86868b;
   --apple-label-tertiary: #6e6e73;
   --apple-label-quaternary: #aeaeb2;
 
+  /* Apple System Colors */
   --apple-blue: #0071e3;
   --apple-blue-hover: #0077ed;
   --apple-green: #34c759;
@@ -98,10 +32,12 @@
   --apple-indigo: #5856d6;
   --apple-cyan: #30b0c7;
 
+  /* Apple Glass & Borders */
   --apple-border: rgba(0, 0, 0, 0.1);
   --apple-border-light: rgba(0, 0, 0, 0.06);
   --apple-border-focus: rgba(0, 113, 227, 0.5);
 
+  /* Element Backgrounds */
   --apple-spotlight-bg: #ffffff;
   --apple-pane-bg: rgba(255, 255, 255, 0.75);
   --apple-card-sub-bg: rgba(255, 255, 255, 0.8);
@@ -117,9 +53,73 @@
   --apple-scrollbar-thumb-hover: rgba(0, 0, 0, 0.28);
   --apple-ambient-glow: radial-gradient(circle, rgba(0, 113, 227, 0.08) 0%, rgba(175, 82, 222, 0.05) 45%, transparent 70%);
 
+  /* Apple Radii */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-full: 9999px;
+
+  /* Shadows */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.07);
   --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.08);
+
+  /* Animation Easing */
+  --ease-apple: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.15);
+}
+
+/* Apple Pro Dark Theme Palette */
+[data-theme="dark"] {
+  --apple-bg: #000000;
+  --apple-surface-1: #161617;
+  --apple-surface-2: #1c1c1e;
+  --apple-surface-3: #2c2c2e;
+  --apple-surface-glass: rgba(28, 28, 30, 0.72);
+  --apple-surface-glass-elevated: rgba(44, 44, 46, 0.65);
+  --apple-glass-hover: rgba(58, 58, 60, 0.5);
+
+  --apple-nav-bg: rgba(0, 0, 0, 0.78);
+  --apple-nav-border: rgba(255, 255, 255, 0.08);
+
+  --apple-label-primary: #f5f5f7;
+  --apple-label-secondary: #86868b;
+  --apple-label-tertiary: #6e6e73;
+  --apple-label-quaternary: #48484a;
+
+  --apple-blue: #2997ff;
+  --apple-blue-hover: #0077ed;
+  --apple-green: #30d158;
+  --apple-orange: #ff9f0a;
+  --apple-red: #ff453a;
+  --apple-purple: #bf5af2;
+  --apple-indigo: #5e5ce6;
+  --apple-cyan: #64d2ff;
+
+  --apple-border: rgba(255, 255, 255, 0.12);
+  --apple-border-light: rgba(255, 255, 255, 0.08);
+  --apple-border-focus: rgba(41, 151, 255, 0.6);
+
+  --apple-spotlight-bg: rgba(18, 18, 20, 0.85);
+  --apple-pane-bg: rgba(28, 28, 30, 0.55);
+  --apple-card-sub-bg: rgba(28, 28, 30, 0.5);
+  --apple-chip-bg: rgba(255, 255, 255, 0.05);
+  --apple-chip-hover: rgba(255, 255, 255, 0.1);
+  --apple-segmented-bg: rgba(28, 28, 30, 0.7);
+  --apple-segmented-active-bg: rgba(68, 68, 70, 0.75);
+  --apple-segmented-active-color: #ffffff;
+  --apple-segmented-active-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  --apple-title-gradient: linear-gradient(180deg, #ffffff 15%, #a1a1a6 90%);
+  --apple-brand-title-gradient: linear-gradient(180deg, #ffffff 30%, #a1a1a6 100%);
+  --apple-scrollbar-thumb: rgba(255, 255, 255, 0.16);
+  --apple-scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+  --apple-ambient-glow: radial-gradient(circle, rgba(41, 151, 255, 0.12) 0%, rgba(191, 90, 242, 0.08) 45%, transparent 70%);
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.45);
 }
 
 *, *::before, *::after {

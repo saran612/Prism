@@ -40,7 +40,8 @@ def test_modular_social_extract_caption_endpoint(mock_fetch):
         "post_id": "1894238573928172635",
         "shortcode": "1894238573928172635",
         "caption": "This is an extracted tweet from X!",
-        "author": "SampleUser"
+        "author": "SampleUser",
+        "thumbnail_url": "https://pbs.twimg.com/media/test_thumb.jpg"
     }
     res = client.post("/api/v1/social/extract-caption", json={"url": "https://x.com/user/status/1894238573928172635"})
     assert res.status_code == 200
@@ -49,6 +50,25 @@ def test_modular_social_extract_caption_endpoint(mock_fetch):
     assert data["post_id"] == "1894238573928172635"
     assert data["caption"] == "This is an extracted tweet from X!"
     assert data["author"] == "SampleUser"
+    assert data["thumbnail_url"] == "https://pbs.twimg.com/media/test_thumb.jpg"
+
+
+@pytest.mark.anyio
+@patch("instaloader.Post.from_shortcode")
+async def test_modular_instagram_fetch_thumbnail(mock_post_cls):
+    from backend.modules.social.instagram import fetch_instagram_post
+    mock_instance = mock_post_cls.return_value
+    mock_instance.caption = "Awesome Instagram reel caption"
+    mock_instance.url = "https://instagram.fdel.cdn.net/v/t51/reel_thumb.jpg"
+    mock_instance.owner_username = "factchecker_india"
+
+    result = await fetch_instagram_post("https://www.instagram.com/reel/DF2N8w7M_vN/")
+    assert result["platform"] == "instagram"
+    assert result["post_id"] == "DF2N8w7M_vN"
+    assert result["caption"] == "Awesome Instagram reel caption"
+    assert result["thumbnail_url"] == "https://instagram.fdel.cdn.net/v/t51/reel_thumb.jpg"
+    assert result["author"] == "factchecker_india"
+
 
 
 def test_modular_translation_detect():
@@ -66,10 +86,26 @@ def test_modular_translation_translate():
 def test_modular_factcheck_api():
     res = client.post("/api/v1/check", json={"text": "Verified claim text for modular test"})
     assert res.status_code == 200
-    assert "fact_check_results" in res.json()
+    data = res.json()
+    assert data["state"] in ["True", "False", "Unverified"]
+    assert isinstance(data["score"], int)
+    assert data["source"] in ["known_factcheck", "llm_inferred"]
+    assert set(data.keys()) == {"state", "score", "source"}
 
 
 def test_modular_history_api():
     res = client.get("/api/v1/history")
     assert res.status_code == 200
     assert isinstance(res.json(), list)
+
+
+def test_modular_stats_api():
+    res = client.get("/api/v1/stats")
+    assert res.status_code == 200
+    data = res.json()
+    assert "total_checks" in data
+    assert "platforms" in data
+    assert "languages" in data
+    assert "verdicts" in data
+    assert isinstance(data["platforms"], dict)
+

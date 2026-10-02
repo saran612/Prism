@@ -65,7 +65,8 @@ async def fetch_twitter_post(url: str) -> Dict[str, Any]:
                         "post_id": post_id,
                         "platform": "twitter",
                         "author": author_name,
-                        "caption": caption
+                        "caption": caption,
+                        "thumbnail_url": None
                     }
     except Exception as e:
         logger.debug(f"Twitter oEmbed failed, trying fallback: {e}")
@@ -80,12 +81,22 @@ async def fetch_twitter_post(url: str) -> Dict[str, Any]:
                 tweet = data.get("tweet", {})
                 caption = tweet.get("text", "")
                 author = tweet.get("author", {}).get("name")
+                media = tweet.get("media", {})
+                photos = media.get("photos", []) if isinstance(media, dict) else []
+                videos = media.get("videos", []) if isinstance(media, dict) else []
+                thumbnail_url = None
+                if photos and isinstance(photos, list) and len(photos) > 0:
+                    thumbnail_url = photos[0].get("url")
+                elif videos and isinstance(videos, list) and len(videos) > 0:
+                    thumbnail_url = videos[0].get("thumbnail_url")
+
                 if caption:
                     return {
                         "post_id": post_id,
                         "platform": "twitter",
                         "author": author,
-                        "caption": caption
+                        "caption": caption,
+                        "thumbnail_url": thumbnail_url
                     }
     except Exception as e:
         logger.debug(f"FxTwitter API failed: {e}")

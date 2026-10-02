@@ -1,36 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-
-const PRESET_SOCIAL_LINKS = [
-  {
-    platform: 'twitter',
-    label: 'X (Twitter) Post',
-    icon: '𝕏',
-    url: 'https://x.com/jack/status/20',
-    desc: 'Twitter status post via public oEmbed'
-  },
-  {
-    platform: 'twitter',
-    label: 'NASA Science Tweet',
-    icon: '𝕏',
-    url: 'https://x.com/NASA/status/1894238573928172635',
-    desc: 'News statement with Indic translation'
-  },
-  {
-    platform: 'instagram',
-    label: 'Instagram Reel',
-    icon: '📸',
-    url: 'https://www.instagram.com/reel/Co94Pz3A-aD',
-    desc: 'Instagram video caption extraction'
-  },
-  {
-    platform: 'facebook',
-    label: 'Facebook Post',
-    icon: '👥',
-    url: 'https://www.facebook.com/share/p/101584920202020/',
-    desc: 'OpenGraph metadata & post text'
-  }
-];
+import Dashboard from './Dashboard';
+import { ROUTE_DEFINITIONS, matchRoute, getBreadcrumbs } from './routes/schema';
+import { Breadcrumbs, NotFoundPage } from './routes/Router';
 
 const INDIC_LANG_MAP = {
   hi: { name: 'Hindi', native: 'हिन्दी' },
@@ -46,21 +18,60 @@ const INDIC_LANG_MAP = {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('verifier'); // 'verifier' | 'api-studio' | 'history'
+  const [currentPath, setCurrentPath] = useState(() => {
+    return typeof window !== 'undefined' ? (window.location.pathname || '/') : '/';
+  });
+
+  const navigateTo = (path) => {
+    if (typeof window !== 'undefined') {
+      const target = path.startsWith('/') ? path : `/${path}`;
+      window.history.pushState({}, '', target);
+      setCurrentPath(target);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname || '/');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const [activeTab, setActiveTab] = useState(() => {
+    const p = typeof window !== 'undefined' ? window.location.pathname : '/';
+    if (p === '/api-studio') return 'api-studio';
+    if (p === '/history') return 'history';
+    return 'verifier';
+  });
+
+  // Synchronize activeTab and document title on currentPath change
+  useEffect(() => {
+    if (currentPath === '/api-studio') {
+      setActiveTab('api-studio');
+    } else if (currentPath === '/history') {
+      setActiveTab('history');
+    } else if (currentPath === '/' || currentPath === '/verifier') {
+      setActiveTab('verifier');
+    }
+
+    document.title = 'Prism';
+  }, [currentPath]);
   const [backendStatus, setBackendStatus] = useState({ online: false, version: '0.1.0' });
 
-  // Theme State ('dark' | 'light')
+  // Theme State ('light' | 'dark')
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('prism_theme') || 'dark';
+    return localStorage.getItem('prism_theme_v2') || 'light';
   });
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('prism_theme', theme);
+    localStorage.setItem('prism_theme_v2', theme);
   }, [theme]);
 
   // Main Social Link State
-  const [socialUrl, setSocialUrl] = useState('https://x.com/jack/status/20');
+  const [socialUrl, setSocialUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -80,8 +91,13 @@ export default function App() {
   // Check Backend Health
   const checkHealth = async () => {
     try {
-      const res = await fetch('/');
-      if (res.ok) {
+      let res;
+      try {
+        res = await fetch('/api/health');
+      } catch {
+        res = await fetch('http://127.0.0.1:8000/api/health');
+      }
+      if (res && res.ok) {
         const data = await res.json();
         setBackendStatus({ online: true, version: data.version || '0.1.0' });
       } else {
@@ -181,7 +197,40 @@ export default function App() {
   };
 
   // Helper for Truthfulness Verdict
-  const getVerdict = (factCheckResults) => {
+  const getVerdict = (res) => {
+    if (!res) {
+      return {
+        label: 'Unverified',
+        type: 'unverified',
+        description: 'No verification data available.'
+      };
+    }
+
+    // Direct 3-field schema: { state: "True"|"False"|"Unverified", score: 0-100, source: "known_factcheck"|"llm_inferred" }
+    if (res.state) {
+      const srcName = res.source === 'known_factcheck' ? 'Google Fact Check Tools' : 'Reputable News RAG (LLM Inferred)';
+      if (res.state === 'False') {
+        return {
+          label: `False (${res.score}%)`,
+          type: 'false',
+          description: `Identified as false/debunked via ${srcName}. Confidence score: ${res.score}/100.`
+        };
+      }
+      if (res.state === 'True') {
+        return {
+          label: `True (${res.score}%)`,
+          type: 'true',
+          description: `Verified as accurate via ${srcName}. Confidence score: ${res.score}/100.`
+        };
+      }
+      return {
+        label: `Unverified (${res.score}%)`,
+        type: 'unverified',
+        description: `Insufficient conclusive evidence found across ${srcName}. Confidence score: ${res.score}/100.`
+      };
+    }
+
+    const factCheckResults = res.fact_check_results || res;
     if (!factCheckResults || !factCheckResults.claims || factCheckResults.claims.length === 0) {
       return {
         label: 'Unverified / No Registry Match',
@@ -238,6 +287,7 @@ with httpx.Client(timeout=15.0) as client:
     print("Detected Language:", result.get("detected_language"))
     print("Extracted Caption:", result.get("text"))
     print("English Translation:", result.get("translated_text"))
+    print("Thumbnail URL:", result.get("thumbnail_url"))
     print("Fact Checks:", result.get("fact_check_results"))`;
     }
     if (apiCodeTab === 'javascript') {
@@ -254,6 +304,7 @@ with httpx.Client(timeout=15.0) as client:
 const data = await response.json();
 console.log("Extracted Caption:", data.text);
 console.log("Language:", data.detected_language);
+console.log("Thumbnail URL:", data.thumbnail_url);
 console.log("Fact Check Results:", data.fact_check_results);`;
     }
     return '';
@@ -270,7 +321,7 @@ console.log("Fact Check Results:", data.fact_check_results);`;
       {/* Apple Frosted Navigation Bar */}
       <nav className="apple-nav">
         <div className="apple-nav-inner">
-          <div className="apple-brand" onClick={() => setActiveTab('verifier')}>
+          <div className="apple-brand" onClick={() => navigateTo('/')} style={{ cursor: 'pointer' }}>
             <div className="apple-brand-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="12 2 2 22 22 22" />
@@ -279,6 +330,63 @@ console.log("Fact Check Results:", data.fact_check_results);`;
             </div>
             <span className="apple-brand-title">Prism</span>
             <span className="apple-brand-pill">Social API</span>
+          </div>
+
+          <div className="apple-nav-center">
+            <button
+              type="button"
+              className={`apple-nav-tab ${currentPath === '/' || currentPath === '/verifier' ? 'active' : ''}`}
+              onClick={() => navigateTo('/')}
+              id="nav-link-verifier"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              <span>Verifier</span>
+            </button>
+
+            <button
+              type="button"
+              className={`apple-nav-tab ${currentPath === '/dashboard' ? 'active' : ''}`}
+              onClick={() => navigateTo('/dashboard')}
+              id="nav-link-dashboard"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="7" height="9" />
+                <rect x="14" y="3" width="7" height="5" />
+                <rect x="14" y="12" width="7" height="9" />
+                <rect x="3" y="16" width="7" height="5" />
+              </svg>
+              <span>Dashboard</span>
+              <span className="apple-nav-badge">Live</span>
+            </button>
+
+            <button
+              type="button"
+              className={`apple-nav-tab ${currentPath === '/api-studio' ? 'active' : ''}`}
+              onClick={() => navigateTo('/api-studio')}
+              id="nav-link-api-studio"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+              <span>API Studio</span>
+            </button>
+
+            <button
+              type="button"
+              className={`apple-nav-tab ${currentPath === '/history' ? 'active' : ''}`}
+              onClick={() => navigateTo('/history')}
+              id="nav-link-history"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span>History</span>
+            </button>
           </div>
 
           <div className="apple-nav-actions">
@@ -331,52 +439,25 @@ console.log("Fact Check Results:", data.fact_check_results);`;
       </nav>
 
       {/* Main Container */}
-      <main className="apple-main">
-        {/* Apple Hero Header */}
-        <header className="apple-hero">
-          <h1 className="apple-hero-title">Verify any social link.</h1>
-        </header>
+      <main className="apple-main" style={currentPath === '/dashboard' ? { maxWidth: '1240px' } : {}}>
+        <Breadcrumbs currentPath={currentPath} onNavigate={navigateTo} />
 
-        {/* Apple Segmented Control */}
-        <div className="apple-segmented-nav">
-          <div className="apple-segmented-container" role="tablist">
-            <button
-              className={`apple-segment-item ${activeTab === 'verifier' ? 'active' : ''}`}
-              onClick={() => setActiveTab('verifier')}
-              id="tab-verifier"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-              Social Link Verifier
-            </button>
-
-            <button
-              className={`apple-segment-item ${activeTab === 'api-studio' ? 'active' : ''}`}
-              onClick={() => setActiveTab('api-studio')}
-              id="tab-api-studio"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="16 18 22 12 16 6" />
-                <polyline points="8 6 2 12 8 18" />
-              </svg>
-              API Call Console
-            </button>
-
-            <button
-              className={`apple-segment-item ${activeTab === 'history' ? 'active' : ''}`}
-              onClick={() => setActiveTab('history')}
-              id="tab-history"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-              Verification History
-            </button>
-          </div>
-        </div>
+        {currentPath === '/dashboard' ? (
+          <Dashboard
+            onNavigate={navigateTo}
+            INDIC_LANG_MAP={INDIC_LANG_MAP}
+            detectPlatformFromUrl={detectPlatformFromUrl}
+          />
+        ) : matchRoute(currentPath) === null ? (
+          <NotFoundPage currentPath={currentPath} onNavigate={navigateTo} />
+        ) : (
+          <>
+            {/* Apple Hero Header */}
+            <header className="apple-hero">
+              <h1 className="apple-hero-title">
+                Verify any <span className="apple-hero-highlight">social</span>.
+              </h1>
+            </header>
 
         {/* TAB 1: SOCIAL LINK VERIFIER */}
         {activeTab === 'verifier' && (
@@ -386,25 +467,7 @@ console.log("Fact Check Results:", data.fact_check_results);`;
               <div className="apple-card-header">
                 <div className="apple-card-title-group">
                   <h2>Verify Social Media URL</h2>
-                  <p>Input a post link to extract caption, translate Indian scripts, and execute real-time fact checking.</p>
                 </div>
-              </div>
-
-              {/* Presets */}
-              <div className="apple-samples-container">
-                <span className="apple-samples-label">Preset Links:</span>
-                {PRESET_SOCIAL_LINKS.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    className="apple-sample-pill"
-                    onClick={() => setSocialUrl(preset.url)}
-                    id={`preset-link-${idx}`}
-                  >
-                    <span>{preset.icon}</span>
-                    <span>{preset.label}</span>
-                  </button>
-                ))}
               </div>
 
               {/* Spotlight Input Bar */}
@@ -533,17 +596,19 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                   <>
                     {/* Verdict Island */}
                     {(() => {
-                      const verdict = getVerdict(result.fact_check_results);
+                      const verdict = getVerdict(result);
                       return (
                         <div className={`apple-verdict-island ${verdict.type}`}>
                           <div className="apple-verdict-info">
-                            <span className="apple-verdict-eyebrow">Verification Classification</span>
+                            <span className="apple-verdict-eyebrow">
+                              {result.source === 'known_factcheck' ? 'Stage 1 • Google Fact Check Registry' : (result.source === 'llm_inferred' ? 'Stage 2 • Reputable News RAG Engine' : 'Verification Classification')}
+                            </span>
                             <div className="apple-verdict-title">{verdict.label}</div>
                             <div className="apple-verdict-desc">{verdict.description}</div>
                           </div>
 
                           <div className={`apple-verdict-badge ${verdict.type}`}>
-                            <span>{verdict.label}</span>
+                            <span>{result.state || verdict.label}</span>
                           </div>
                         </div>
                       );
@@ -558,7 +623,7 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                           </div>
                           <div className="apple-post-meta-lines">
                             <div className="apple-post-author">
-                              {detectedPlatform ? detectedPlatform.name : 'Social Post Extraction'}
+                              {result.author ? `@${result.author}` : (detectedPlatform ? detectedPlatform.name : 'Social Post Extraction')}
                             </div>
                             <div className="apple-post-id-tag">
                               Extracted URL: {socialUrl}
@@ -581,6 +646,23 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                           </svg>
                         </a>
                       </div>
+
+                      {result.thumbnail_url && (
+                        <div className="apple-post-media-preview">
+                          <img
+                            src={result.thumbnail_url}
+                            alt="Post Media Thumbnail"
+                            className="apple-post-thumbnail-img"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              e.currentTarget.parentElement.style.display = 'none';
+                            }}
+                          />
+                          <div className="apple-post-thumbnail-badge">
+                            <span>📸 Media Thumbnail</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Dual Pane Language & Translation */}
@@ -679,6 +761,29 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                               </div>
                             );
                           })}
+                        </div>
+                      ) : result.source ? (
+                        <div style={{ padding: '24px 20px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--apple-label-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verification Source</span>
+                              <div style={{ fontSize: '1rem', fontWeight: 600, marginTop: '4px', color: 'var(--apple-label-primary)' }}>
+                                {result.source === 'known_factcheck' ? 'Google Fact Check Tools' : 'Reputable News RAG (LLM Inferred)'}
+                              </div>
+                            </div>
+                            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--apple-label-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Confidence Score</span>
+                              <div style={{ fontSize: '1rem', fontWeight: 600, marginTop: '4px', color: 'var(--apple-label-primary)' }}>
+                                {result.score} / 100
+                              </div>
+                            </div>
+                            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--apple-label-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Classification State</span>
+                              <div style={{ fontSize: '1rem', fontWeight: 600, marginTop: '4px', color: 'var(--apple-label-primary)' }}>
+                                {result.state}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       ) : (
                         <div style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--apple-label-secondary)' }}>
@@ -904,10 +1009,23 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                               text: item.input_text,
                               detected_language: item.detected_language || 'en',
                               translated_text: item.translated_text || item.input_text,
-                              fact_check_results: item.fact_check_results || { claims: [] }
+                              fact_check_results: item.fact_check_results || { claims: [] },
+                              thumbnail_url: item.thumbnail_url,
+                              author: item.author
                             });
                           }}
                         >
+                          {item.thumbnail_url && (
+                            <img
+                              src={item.thumbnail_url}
+                              alt="Thumbnail"
+                              className="apple-history-thumb"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          )}
                           <div className="apple-history-content">
                             <div className="apple-history-text">{item.input_text}</div>
                             <div className="apple-history-meta">
@@ -939,18 +1057,13 @@ console.log("Fact Check Results:", data.fact_check_results);`;
             </div>
           </div>
         )}
+          </>
+        )}
       </main>
 
       {/* Apple Footer */}
       <footer className="apple-footer">
-        <div>Prism Intelligence Platform • Social Media Verification & Multi-Lingual Fact-Checking API</div>
-        <div style={{ marginTop: '6px' }}>
-          <a href="/docs" target="_blank" rel="noreferrer">OpenAPI Documentation</a>
-          •
-          <a href="https://github.com/saran612/Prism" target="_blank" rel="noreferrer">GitHub Repository</a>
-          •
-          <span>Strictly Social Link API Processing</span>
-        </div>
+        <div>Prism 2026</div>
       </footer>
     </div>
   );

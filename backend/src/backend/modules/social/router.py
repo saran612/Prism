@@ -15,7 +15,8 @@ async def extract_caption(request: ExtractCaptionRequest):
             post_id=post_data.get("post_id", ""),
             shortcode=post_data.get("shortcode", post_data.get("post_id", "")),
             caption=post_data.get("caption", ""),
-            author=post_data.get("author")
+            author=post_data.get("author"),
+            thumbnail_url=post_data.get("thumbnail_url")
         )
     except ValueError as e:
         raise HTTPException(

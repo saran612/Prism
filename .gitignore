@@ -173,3 +173,6 @@ service_account*.json
 client_secret*.json
 gcp-key*.json
 
+# Scripts
+scripts/
+

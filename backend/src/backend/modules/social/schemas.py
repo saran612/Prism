@@ -13,3 +13,4 @@ class ExtractCaptionResponse(BaseModel):
     shortcode: Optional[str] = None
     caption: str
     author: Optional[str] = None
+    thumbnail_url: Optional[str] = None

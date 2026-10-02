@@ -43,19 +43,6 @@ export const ROUTE_DEFINITIONS = [
     icon: 'history',
     vercelRewrite: '/index.html',
     badge: null
-  },
-  {
-    id: 'vercel',
-    path: '/vercel',
-    aliases: ['/routing', '/schemas', '/architecture', '/deployment'],
-    title: 'Vercel Edge Routing & Deployment Architecture',
-    navLabel: 'Vercel & Schemas',
-    description: 'Live Vercel edge rewrites visualization, routing schemas, sandbox tester, and vercel.json preview.',
-    category: 'Deployment',
-    navbar: true,
-    icon: 'vercel',
-    vercelRewrite: '/index.html',
-    badge: 'Schema'
   }
 ];
 

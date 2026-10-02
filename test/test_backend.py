@@ -120,9 +120,11 @@ def test_api_check_text():
     response = client.post("/check", json={"text": "This is a simple english sentence to verify the fact checking API."})
     assert response.status_code == 200
     data = response.json()
-    assert "This is a simple english sentence" in data["text"]
-    assert data["detected_language"] == "en"
-    assert "fact_check_results" in data
+    assert data["state"] in ["True", "False", "Unverified"]
+    assert isinstance(data["score"], int)
+    assert 0 <= data["score"] <= 100
+    assert data["source"] in ["known_factcheck", "llm_inferred"]
+    assert set(data.keys()) == {"state", "score", "source"}
 
 
 def test_api_check_invalid_url():
@@ -145,8 +147,10 @@ def test_api_check_twitter_url(mock_fetch):
     response = client.post("/check", json={"url": "https://x.com/NASA/status/1894238573928172635"})
     assert response.status_code == 200
     data = response.json()
-    assert "Scientists discover new water ice deposits" in data["text"]
-    assert data["detected_language"] == "en"
+    assert data["state"] in ["True", "False", "Unverified"]
+    assert isinstance(data["score"], int)
+    assert data["source"] in ["known_factcheck", "llm_inferred"]
+    assert set(data.keys()) == {"state", "score", "source"}
 
 
 @patch("backend.modules.factcheck.services.fetch_social_caption", new_callable=AsyncMock)
@@ -155,7 +159,10 @@ def test_api_check_facebook_url(mock_fetch):
     response = client.post("/check", json={"url": "https://www.facebook.com/share/p/101584920202020/"})
     assert response.status_code == 200
     data = response.json()
-    assert "Breaking news announcement" in data["text"]
+    assert data["state"] in ["True", "False", "Unverified"]
+    assert isinstance(data["score"], int)
+    assert data["source"] in ["known_factcheck", "llm_inferred"]
+    assert set(data.keys()) == {"state", "score", "source"}
 
 
 @pytest.mark.anyio
@@ -201,3 +208,73 @@ def test_api_history():
     assert len(data) > 0
     assert "input_text" in data[0]
     assert "response_payload" not in data[0] or "created_at" in data[0]
+
+
+def test_normalize_factcheck_rating():
+    from backend.modules.factcheck.services import normalize_factcheck_rating
+
+    # 1. "mostly false", "misleading", "exaggerated" → "False", score 60-75
+    state, score = normalize_factcheck_rating("Mostly False")
+    assert state == "False" and 60 <= score <= 75
+
+    state, score = normalize_factcheck_rating("Misleading claim")
+    assert state == "False" and 60 <= score <= 75
+
+    # 2. "false", "pants on fire", "fabricated", "incorrect" → "False", score 85-100
+    state, score = normalize_factcheck_rating("False")
+    assert state == "False" and 85 <= score <= 100
+
+    state, score = normalize_factcheck_rating("Pants on Fire!")
+    assert state == "False" and 85 <= score <= 100
+
+    # 3. "half true", "mixture", "partly true", "unproven" → "Unverified", score 40-55
+    state, score = normalize_factcheck_rating("Half True")
+    assert state == "Unverified" and 40 <= score <= 55
+
+    state, score = normalize_factcheck_rating("Partly true")
+    assert state == "Unverified" and 40 <= score <= 55
+
+    # 4. "mostly true", "largely true" → "True", score 65-80
+    state, score = normalize_factcheck_rating("Mostly True")
+    assert state == "True" and 65 <= score <= 80
+
+    # 5. "true", "correct", "accurate" → "True", score 90-100
+    state, score = normalize_factcheck_rating("Correct")
+    assert state == "True" and 90 <= score <= 100
+
+    state, score = normalize_factcheck_rating("Accurate")
+    assert state == "True" and 90 <= score <= 100
+
+    # 6. Unrecognized → "Unverified", score 50
+    state, score = normalize_factcheck_rating("Random unmapped text")
+    assert state == "Unverified" and score == 50
+
+
+def test_parse_llm_verdict():
+    from backend.modules.factcheck.fallback import parse_llm_verdict
+
+    # Clean JSON
+    state, score = parse_llm_verdict('{"state": "True", "score": 90}')
+    assert state == "True" and score == 90
+
+    # Markdown wrapped JSON
+    state, score = parse_llm_verdict('```json\n{"state": "False", "score": 85}\n```')
+    assert state == "False" and score == 85
+
+    # Malformed / Defensive fallback
+    state, score = parse_llm_verdict("This is not valid json")
+    assert state == "Unverified" and score == 0
+
+
+@pytest.mark.anyio
+async def test_fallback_fact_check_zero_evidence():
+    from backend.modules.factcheck.fallback import fallback_fact_check
+
+    with patch("backend.modules.factcheck.fallback.retrieve_evidence") as mock_retrieve:
+        mock_retrieve.return_value = ([], 0)
+        res = await fallback_fact_check("completely fictional claim")
+        assert res["state"] == "Unverified"
+        assert res["score"] == 0
+        assert res["source"] == "llm_inferred"
+        assert res["_internal"]["llm_skipped"] is True
+

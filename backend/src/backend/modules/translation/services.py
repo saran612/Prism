@@ -1,6 +1,9 @@
 import logging
-from langdetect import detect
+from langdetect import detect, DetectorFactory
 from deep_translator import GoogleTranslator
+
+# Enforce deterministic language detection across runs
+DetectorFactory.seed = 0
 
 logger = logging.getLogger("prism.translation")
 

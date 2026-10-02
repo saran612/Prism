@@ -39,12 +39,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Root endpoint
+# Root and health endpoints
 @app.get("/")
+@app.get("/api/health")
+@app.get("/api/v1/health")
 def read_root():
     return {
         "message": "Hello from Prism FastAPI backend",
         "version": settings.APP_VERSION,
+        "status": "healthy",
         "docs_url": "/docs"
     }
 

@@ -1,5 +1,5 @@
+from typing import Optional, Any, Literal
 from pydantic import BaseModel
-from typing import Optional, Any
 
 
 class CheckRequest(BaseModel):
@@ -8,10 +8,9 @@ class CheckRequest(BaseModel):
 
 
 class CheckResponse(BaseModel):
-    text: str
-    detected_language: str
-    translated_text: str
-    fact_check_results: dict[str, Any]
+    state: Literal["True", "False", "Unverified"]
+    score: int
+    source: Literal["known_factcheck", "llm_inferred"]
 
 
 class FactCheckHistoryItem(BaseModel):
@@ -22,3 +21,5 @@ class FactCheckHistoryItem(BaseModel):
     translated_text: Optional[str] = None
     fact_check_results: Optional[dict[str, Any]] = None
     created_at: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+

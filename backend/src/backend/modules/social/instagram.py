@@ -21,32 +21,48 @@ def extract_instagram_shortcode(url: str) -> str:
     raise ValueError("Invalid Instagram URL format")
 
 
-def fetch_instagram_caption_sync(shortcode: str) -> str:
-    """Synchronous fetch of Instagram post caption using Instaloader."""
+def fetch_instagram_data_sync(shortcode: str) -> Dict[str, Any]:
+    """Synchronous fetch of Instagram post data (caption, thumbnail_url, author) using Instaloader."""
     loader = instaloader.Instaloader()
     post = instaloader.Post.from_shortcode(loader.context, shortcode)
-    return post.caption if post.caption else ""
+    return {
+        "caption": post.caption if post.caption else "",
+        "thumbnail_url": getattr(post, "url", None),
+        "author": getattr(post, "owner_username", None),
+    }
+
+
+def fetch_instagram_caption_sync(shortcode: str) -> str:
+    """Synchronous fetch of Instagram post caption using Instaloader."""
+    data = fetch_instagram_data_sync(shortcode)
+    return data.get("caption", "")
 
 
 async def fetch_instagram_caption(url: str) -> str:
     """Asynchronously calls the sync Instaloader function in a threadpool."""
     try:
         shortcode = extract_instagram_shortcode(url)
-        caption = await anyio.to_thread.run_sync(fetch_instagram_caption_sync, shortcode)
-        return caption
+        data = await anyio.to_thread.run_sync(fetch_instagram_data_sync, shortcode)
+        return data.get("caption", "")
     except Exception as e:
         logger.error(f"Error fetching Instagram post: {e}")
         raise ValueError("could not fetch post content")
 
 
 async def fetch_instagram_post(url: str) -> Dict[str, Any]:
-    """Fetches full post metadata dictionary for Instagram."""
-    shortcode = extract_instagram_shortcode(url)
-    caption = await fetch_instagram_caption(url)
-    return {
-        "platform": "instagram",
-        "post_id": shortcode,
-        "shortcode": shortcode,
-        "caption": caption,
-        "author": None
-    }
+    """Fetches full post metadata dictionary for Instagram including thumbnail_url."""
+    try:
+        shortcode = extract_instagram_shortcode(url)
+        data = await anyio.to_thread.run_sync(fetch_instagram_data_sync, shortcode)
+        return {
+            "platform": "instagram",
+            "post_id": shortcode,
+            "shortcode": shortcode,
+            "caption": data.get("caption", ""),
+            "author": data.get("author"),
+            "thumbnail_url": data.get("thumbnail_url"),
+        }
+    except Exception as e:
+        logger.error(f"Error fetching Instagram post: {e}")
+        raise ValueError("could not fetch post content")
+
