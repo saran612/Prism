@@ -43,18 +43,25 @@
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: linear-gradient(135deg, var(--apple-surface-3), var(--apple-surface-1));
+  background: var(--apple-surface-1);
   border: 1px solid var(--apple-border);
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: var(--shadow-sm);
-  color: var(--apple-label-primary);
+  overflow: hidden;
   transition: transform 0.3s var(--ease-spring);
 }
 
 .apple-brand:hover .apple-brand-icon {
   transform: scale(1.05);
+}
+
+.apple-brand-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .apple-brand-title {
