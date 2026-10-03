@@ -109,19 +109,17 @@
 .apple-status-capsule {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 12px;
-  border-radius: var(--radius-full);
-  background: var(--apple-chip-bg);
-  border: 1px solid var(--apple-border-light);
-  font-size: 0.78rem;
-  color: var(--apple-label-secondary);
-  font-weight: 500;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  cursor: default;
 }
 
 .apple-status-indicator {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--apple-green);
   box-shadow: 0 0 10px rgba(48, 209, 88, 0.6);
@@ -156,6 +154,20 @@
   width: 100%;
   margin: 0 auto;
   padding: 44px 24px 100px 24px;
+}
+
+/* Dashboard Full-Width (Removes Left & Right Margins) */
+.apple-main.apple-main-fullwidth {
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 32px 24px 80px 24px;
+}
+
+@media (max-width: 768px) {
+  .apple-main.apple-main-fullwidth {
+    padding: 24px 16px 60px 16px;
+  }
 }
 
 /* Hero Section */
@@ -247,6 +259,36 @@
 
 [data-theme="light"] .apple-card:hover {
   border-color: rgba(0, 0, 0, 0.16);
+}
+
+/* Centered Verifier Stage (Both Horizontal and Vertical Alignment) */
+.apple-verifier-stage {
+  min-height: calc(100vh - 64px - 144px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.apple-verifier-stage.has-results {
+  min-height: auto;
+  justify-content: flex-start;
+  padding-top: 10px;
+}
+
+.apple-verifier-wrapper {
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.apple-verifier-card {
+  max-width: 800px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Card Header */
@@ -787,7 +829,7 @@
 
 /* API Playground / Code Box */
 .apple-code-box {
-  background: #18181b;
+  background: #000000;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -799,10 +841,39 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 18px;
-  background: #202024;
+  background: #000000;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-wrap: wrap;
   gap: 8px;
+}
+
+/* API Playground Schema Cards (All Black) */
+.apple-schema-card {
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 20px;
+}
+
+.apple-schema-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: #000000;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.apple-schema-body {
+  background: #000000;
+  padding: 16px 20px;
+  font-family: var(--sf-mono);
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: #e2e8f0;
+  overflow-x: auto;
 }
 
 .apple-code-tabs {
@@ -1117,13 +1188,13 @@
 .prism-stat-band {
   display: flex;
   flex-direction: row;
-  width: 100%;
+  width: auto;
+  margin: 0 100px 24px 100px;
   gap: 5px;
   border-radius: 0px;
   overflow: visible;
   border: none;
   box-shadow: none;
-  margin-bottom: 24px;
   background: transparent;
 }
 
@@ -1200,6 +1271,7 @@
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 5px;
+    margin: 0 16px 20px 16px;
   }
 
   .prism-stat-segment {
@@ -1211,6 +1283,7 @@
   .prism-stat-band {
     grid-template-columns: 1fr;
     gap: 5px;
+    margin: 0 8px 16px 8px;
   }
 
   .prism-stat-segment {

@@ -6,9 +6,22 @@
 
 export const ROUTE_DEFINITIONS = [
   {
-    id: 'verifier',
+    id: 'dashboard',
     path: '/',
-    aliases: ['/verifier'],
+    aliases: ['/dashboard'],
+    title: 'Fact-Check Analytics & Intelligence',
+    navLabel: 'Dashboard',
+    description: 'Real-time telemetry, claim scatter plot distribution, verified velocity, and Indic coverage.',
+    category: 'Analytics',
+    navbar: true,
+    icon: 'dashboard',
+    vercelRewrite: '/index.html',
+    badge: null
+  },
+  {
+    id: 'verifier',
+    path: '/verifier',
+    aliases: ['/verify'],
     title: 'Social Link Verifier Studio',
     navLabel: 'Verifier',
     description: 'Verify public Instagram, X (Twitter), and Facebook URLs with Indic script translation & fact checks.',

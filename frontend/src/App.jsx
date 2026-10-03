@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import Dashboard from './Dashboard';
-import { ROUTE_DEFINITIONS, matchRoute, getBreadcrumbs } from './routes/schema';
-import { Breadcrumbs, NotFoundPage } from './routes/Router';
+import { ROUTE_DEFINITIONS, matchRoute } from './routes/schema';
+import { NotFoundPage } from './routes/Router';
 
 const INDIC_LANG_MAP = {
   hi: { name: 'Hindi', native: 'हिन्दी' },
@@ -43,7 +43,8 @@ export default function App() {
     const p = typeof window !== 'undefined' ? window.location.pathname : '/';
     if (p === '/api-studio') return 'api-studio';
     if (p === '/history') return 'history';
-    return 'verifier';
+    if (p === '/verifier' || p === '/verify') return 'verifier';
+    return 'dashboard';
   });
 
   // Synchronize activeTab and document title on currentPath change
@@ -52,8 +53,10 @@ export default function App() {
       setActiveTab('api-studio');
     } else if (currentPath === '/history') {
       setActiveTab('history');
-    } else if (currentPath === '/' || currentPath === '/verifier') {
+    } else if (currentPath === '/verifier' || currentPath === '/verify') {
       setActiveTab('verifier');
+    } else if (currentPath === '/' || currentPath === '/dashboard') {
+      setActiveTab('dashboard');
     }
 
     document.title = 'Prism';
@@ -81,6 +84,8 @@ export default function App() {
   // API Studio State
   const [apiCodeTab, setApiCodeTab] = useState('curl'); // 'curl' | 'python' | 'javascript'
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedReqSchema, setCopiedReqSchema] = useState(false);
+  const [copiedResSchema, setCopiedResSchema] = useState(false);
 
   // History State
   const [historyItems, setHistoryItems] = useState([]);
@@ -316,6 +321,25 @@ console.log("Fact Check Results:", data.fact_check_results);`;
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
+  const copyReqSchema = () => {
+    const json = JSON.stringify({ url: "https://x.com/NASA/status/1894238573928172635" }, null, 2);
+    navigator.clipboard.writeText(json);
+    setCopiedReqSchema(true);
+    setTimeout(() => setCopiedReqSchema(false), 2000);
+  };
+
+  const copyResSchema = () => {
+    const json = JSON.stringify({
+      text: "string",
+      detected_language: "string",
+      translated_text: "string",
+      fact_check_results: {}
+    }, null, 2);
+    navigator.clipboard.writeText(json);
+    setCopiedResSchema(true);
+    setTimeout(() => setCopiedResSchema(false), 2000);
+  };
+
   return (
     <div className="apple-app">
       {/* Apple Frosted Navigation Bar */}
@@ -329,27 +353,13 @@ console.log("Fact Check Results:", data.fact_check_results);`;
               </svg>
             </div>
             <span className="apple-brand-title">Prism</span>
-            <span className="apple-brand-pill">Social API</span>
           </div>
 
           <div className="apple-nav-center">
             <button
               type="button"
-              className={`apple-nav-tab ${currentPath === '/' || currentPath === '/verifier' ? 'active' : ''}`}
+              className={`apple-nav-tab ${currentPath === '/' || currentPath === '/dashboard' ? 'active' : ''}`}
               onClick={() => navigateTo('/')}
-              id="nav-link-verifier"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-              <span>Verifier</span>
-            </button>
-
-            <button
-              type="button"
-              className={`apple-nav-tab ${currentPath === '/dashboard' ? 'active' : ''}`}
-              onClick={() => navigateTo('/dashboard')}
               id="nav-link-dashboard"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -359,7 +369,19 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                 <rect x="3" y="16" width="7" height="5" />
               </svg>
               <span>Dashboard</span>
-              <span className="apple-nav-badge">Live</span>
+            </button>
+
+            <button
+              type="button"
+              className={`apple-nav-tab ${currentPath === '/verifier' || currentPath === '/verify' ? 'active' : ''}`}
+              onClick={() => navigateTo('/verifier')}
+              id="nav-link-verifier"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              <span>Verifier</span>
             </button>
 
             <button
@@ -417,11 +439,6 @@ console.log("Fact Check Results:", data.fact_check_results);`;
               )}
             </button>
 
-            <div className={`apple-status-capsule ${backendStatus.online ? 'online' : 'offline'}`} id="backend-status-pill">
-              <span className="apple-status-indicator"></span>
-              <span>{backendStatus.online ? `API Live (v${backendStatus.version})` : 'Connecting API...'}</span>
-            </div>
-
             <a
               href="/docs"
               target="_blank"
@@ -434,15 +451,21 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                 <path d="M7 17l9.2-9.2M17 17V8H8" />
               </svg>
             </a>
+
+            <div
+              className={`apple-status-capsule ${backendStatus.online ? 'online' : 'offline'}`}
+              id="backend-status-pill"
+              title={backendStatus.online ? `API Live (v${backendStatus.version})` : 'Connecting API...'}
+            >
+              <span className="apple-status-indicator"></span>
+            </div>
           </div>
         </div>
       </nav>
 
       {/* Main Container */}
-      <main className="apple-main" style={currentPath === '/dashboard' ? { maxWidth: '1240px' } : {}}>
-        <Breadcrumbs currentPath={currentPath} onNavigate={navigateTo} />
-
-        {currentPath === '/dashboard' ? (
+      <main className={`apple-main ${currentPath === '/' || currentPath === '/dashboard' ? 'apple-main-fullwidth' : ''}`}>
+        {currentPath === '/' || currentPath === '/dashboard' ? (
           <Dashboard
             onNavigate={navigateTo}
             INDIC_LANG_MAP={INDIC_LANG_MAP}
@@ -452,23 +475,24 @@ console.log("Fact Check Results:", data.fact_check_results);`;
           <NotFoundPage currentPath={currentPath} onNavigate={navigateTo} />
         ) : (
           <>
+        {/* TAB 1: SOCIAL LINK VERIFIER */}
+        {activeTab === 'verifier' && (
+          <div className={`apple-fade-in apple-verifier-stage ${result ? 'has-results' : ''}`}>
             {/* Apple Hero Header */}
             <header className="apple-hero">
               <h1 className="apple-hero-title">
-                Verify any <span className="apple-hero-highlight">social</span>.
+                Verify any <span className="apple-hero-highlight">social</span>
               </h1>
             </header>
 
-        {/* TAB 1: SOCIAL LINK VERIFIER */}
-        {activeTab === 'verifier' && (
-          <div className="apple-fade-in">
-            {/* Input Surface */}
-            <div className="apple-card">
-              <div className="apple-card-header">
-                <div className="apple-card-title-group">
-                  <h2>Verify Social Media URL</h2>
+            <div className="apple-verifier-wrapper">
+              {/* Input Surface */}
+              <div className="apple-card apple-verifier-card">
+                <div className="apple-card-header">
+                  <div className="apple-card-title-group">
+                    <h2>Verify Social Media URL</h2>
+                  </div>
                 </div>
-              </div>
 
               {/* Spotlight Input Bar */}
               <form onSubmit={handleVerifyLink}>
@@ -538,7 +562,7 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
-                        <span>Execute API Verification</span>
+                        <span>Check</span>
                       </>
                     )}
                   </button>
@@ -815,6 +839,7 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                 )}
               </div>
             )}
+            </div>
           </div>
         )}
 
@@ -899,26 +924,80 @@ console.log("Fact Check Results:", data.fact_check_results);`;
               {/* Request & Response Schema Documentation */}
               <div style={{ marginTop: '28px' }}>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '12px' }}>Request Body Schema</h3>
-                <div style={{ background: 'rgba(18, 18, 20, 0.6)', border: '1px solid var(--apple-border-light)', borderRadius: 'var(--radius-sm)', padding: '16px', fontFamily: 'var(--sf-mono)', fontSize: '0.84rem' }}>
-                  <div style={{ color: 'var(--apple-label-secondary)' }}>// POST JSON Payload</div>
-                  <div>&#123;</div>
-                  <div style={{ paddingLeft: '20px' }}>
-                    <span style={{ color: '#64d2ff' }}>"url"</span>: <span style={{ color: '#a7f3d0' }}>"https://x.com/NASA/status/1894238573928172635"</span> <span style={{ color: 'var(--apple-label-tertiary)' }}>// Required: Social media URL</span>
+                <div className="apple-schema-card">
+                  <div className="apple-schema-header">
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontFamily: 'var(--sf-mono)', fontWeight: 600 }}>JSON (application/json)</span>
+                    <button
+                      type="button"
+                      className="apple-copy-btn"
+                      onClick={copyReqSchema}
+                    >
+                      {copiedReqSchema ? (
+                        <>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                          </svg>
+                          <span>Copy Schema</span>
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <div>&#125;</div>
+                  <div className="apple-schema-body">
+                    <div style={{ color: 'var(--apple-label-secondary)' }}>// POST JSON Payload</div>
+                    <div>&#123;</div>
+                    <div style={{ paddingLeft: '20px' }}>
+                      <span style={{ color: '#64d2ff' }}>"url"</span>: <span style={{ color: '#a7f3d0' }}>"https://x.com/NASA/status/1894238573928172635"</span> <span style={{ color: 'var(--apple-label-tertiary)' }}>// Required: Social media URL</span>
+                    </div>
+                    <div>&#125;</div>
+                  </div>
                 </div>
 
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '24px 0 12px 0' }}>Response Payload Schema</h3>
-                <div style={{ background: 'rgba(18, 18, 20, 0.6)', border: '1px solid var(--apple-border-light)', borderRadius: 'var(--radius-sm)', padding: '16px', fontFamily: 'var(--sf-mono)', fontSize: '0.84rem' }}>
-                  <div style={{ color: 'var(--apple-label-secondary)' }}>// 200 OK Response</div>
-                  <div>&#123;</div>
-                  <div style={{ paddingLeft: '20px' }}>
-                    <div><span style={{ color: '#64d2ff' }}>"text"</span>: <span style={{ color: 'var(--apple-label-tertiary)' }}>string</span>, <span style={{ color: 'var(--apple-label-secondary)' }}>// Extracted post caption in native language</span></div>
-                    <div><span style={{ color: '#64d2ff' }}>"detected_language"</span>: <span style={{ color: 'var(--apple-label-tertiary)' }}>string</span>, <span style={{ color: 'var(--apple-label-secondary)' }}>// ISO language code (e.g. 'hi', 'ta', 'te', 'en')</span></div>
-                    <div><span style={{ color: '#64d2ff' }}>"translated_text"</span>: <span style={{ color: 'var(--apple-label-tertiary)' }}>string</span>, <span style={{ color: 'var(--apple-label-secondary)' }}>// Translated English statement</span></div>
-                    <div><span style={{ color: '#64d2ff' }}>"fact_check_results"</span>: <span style={{ color: 'var(--apple-label-tertiary)' }}>object</span> <span style={{ color: 'var(--apple-label-secondary)' }}>// Google Fact Check API claims & review ratings</span></div>
+                <div className="apple-schema-card">
+                  <div className="apple-schema-header">
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontFamily: 'var(--sf-mono)', fontWeight: 600 }}>JSON (application/json)</span>
+                    <button
+                      type="button"
+                      className="apple-copy-btn"
+                      onClick={copyResSchema}
+                    >
+                      {copiedResSchema ? (
+                        <>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                          </svg>
+                          <span>Copy Schema</span>
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <div>&#125;</div>
+                  <div className="apple-schema-body">
+                    <div style={{ color: 'var(--apple-label-secondary)' }}>// 200 OK Response</div>
+                    <div>&#123;</div>
+                    <div style={{ paddingLeft: '20px' }}>
+                      <div><span style={{ color: '#64d2ff' }}>"text"</span>: <span style={{ color: 'var(--apple-label-tertiary)' }}>string</span>, <span style={{ color: 'var(--apple-label-secondary)' }}>// Extracted post caption in native language</span></div>
+                      <div><span style={{ color: '#64d2ff' }}>"detected_language"</span>: <span style={{ color: 'var(--apple-label-tertiary)' }}>string</span>, <span style={{ color: 'var(--apple-label-secondary)' }}>// ISO language code (e.g. 'hi', 'ta', 'te', 'en')</span></div>
+                      <div><span style={{ color: '#64d2ff' }}>"translated_text"</span>: <span style={{ color: 'var(--apple-label-tertiary)' }}>string</span>, <span style={{ color: 'var(--apple-label-secondary)' }}>// Translated English statement</span></div>
+                      <div><span style={{ color: '#64d2ff' }}>"fact_check_results"</span>: <span style={{ color: 'var(--apple-label-tertiary)' }}>object</span> <span style={{ color: 'var(--apple-label-secondary)' }}>// Google Fact Check API claims & review ratings</span></div>
+                    </div>
+                    <div>&#125;</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1004,7 +1083,6 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                           className="apple-history-item"
                           onClick={() => {
                             if (item.source_url) setSocialUrl(item.source_url);
-                            setActiveTab('verifier');
                             setResult({
                               text: item.input_text,
                               detected_language: item.detected_language || 'en',
@@ -1013,6 +1091,7 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                               thumbnail_url: item.thumbnail_url,
                               author: item.author
                             });
+                            navigateTo('/verifier');
                           }}
                         >
                           {item.thumbnail_url && (

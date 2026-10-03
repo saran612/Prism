@@ -5,11 +5,9 @@ export default function Dashboard({ onNavigate, INDIC_LANG_MAP, detectPlatformFr
   const [stats, setStats] = useState(null);
   const [historyItems, setHistoryItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   const fetchDashboardData = async () => {
     try {
-      setRefreshing(true);
       const [statsRes, historyRes] = await Promise.all([
         fetch('/api/v1/stats'),
         fetch('/api/v1/history?limit=100')
@@ -28,7 +26,6 @@ export default function Dashboard({ onNavigate, INDIC_LANG_MAP, detectPlatformFr
       console.error('Failed to load dashboard data:', err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
@@ -87,42 +84,18 @@ export default function Dashboard({ onNavigate, INDIC_LANG_MAP, detectPlatformFr
       {/* Dashboard Top Header */}
       <div className="apple-dashboard-header">
         <div className="apple-dashboard-header-text">
-          <span className="apple-dashboard-eyebrow">
-            <span className="apple-live-pulse-dot"></span>
-            PRISM INTELLIGENCE PLATFORM
-          </span>
-          <h1 className="apple-dashboard-title">Fact-Check Analytics & Intelligence</h1>
+          <h1 className="apple-dashboard-title">Misinformation Detection Analytics</h1>
           <p className="apple-dashboard-subtitle">
-            Ingestion monitoring and veracity analytics for Instagram, X (Twitter), and Facebook claims with Indic script identification.
+            Real-time ingestion monitoring and veracity analytics for Instagram, X (Twitter), and Facebook claims with Indic script identification.
           </p>
         </div>
 
         <div className="apple-dashboard-actions">
-          <button
-            type="button"
-            className="apple-dashboard-btn-secondary"
-            onClick={fetchDashboardData}
-            disabled={refreshing}
-            id="dashboard-refresh-btn"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              className={refreshing ? 'apple-spin' : ''}
-            >
-              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
-            </svg>
-            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
-          </button>
 
           <button
             type="button"
             className="apple-dashboard-btn-primary"
-            onClick={() => onNavigate('/')}
+            onClick={() => onNavigate('/verifier')}
             id="dashboard-verify-new-btn"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">

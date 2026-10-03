@@ -172,7 +172,7 @@ export function NotFoundPage({ currentPath: propPath, onNavigate }) {
           className="apple-btn-primary"
           onClick={() => nav('/')}
         >
-          Return to Verifier
+          Return to Dashboard
         </button>
       </div>
 
@@ -184,7 +184,7 @@ export function NotFoundPage({ currentPath: propPath, onNavigate }) {
           {ROUTE_DEFINITIONS.map((r) => (
             <div
               key={r.id}
-              onClick={() => navigate(r.path)}
+              onClick={() => nav(r.path)}
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
