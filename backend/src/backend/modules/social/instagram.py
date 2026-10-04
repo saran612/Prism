@@ -2,6 +2,7 @@ import re
 import logging
 from typing import Dict, Any
 import anyio
+import anyio.to_thread
 import instaloader
 
 logger = logging.getLogger("prism.social.instagram")
@@ -46,7 +47,7 @@ async def fetch_instagram_caption(url: str) -> str:
         return data.get("caption", "")
     except Exception as e:
         logger.error(f"Error fetching Instagram post: {e}")
-        raise ValueError("could not fetch post content")
+        raise ValueError(f"Could not fetch Instagram post: {e}")
 
 
 async def fetch_instagram_post(url: str) -> Dict[str, Any]:
@@ -64,5 +65,5 @@ async def fetch_instagram_post(url: str) -> Dict[str, Any]:
         }
     except Exception as e:
         logger.error(f"Error fetching Instagram post: {e}")
-        raise ValueError("could not fetch post content")
+        raise ValueError(f"Could not fetch Instagram post: {e}")
 
