@@ -1,0 +1,10 @@
+{
+  "venvPath": "backend",
+  "venv": ".venv",
+  "extraPaths": [
+    "backend/src"
+  ],
+  "exclude": [
+    "backend/_temp_unused"
+  ]
+}

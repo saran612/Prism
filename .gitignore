@@ -176,3 +176,15 @@ gcp-key*.json
 # Scripts
 scripts/
 
+# Temporary and Scratch files
+_temp_unused/
+*_temp_unused*
+temp/
+tmp/
+scratch/
+*.tmp
+*.temp
+*.bak
+*~
+
+

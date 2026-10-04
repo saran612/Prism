@@ -16,6 +16,9 @@ class Settings(BaseModel):
         "postgresql+psycopg://postgres@localhost:5432/prism_db"
     )
     GOOGLE_API_KEY: str | None = os.getenv("GOOGLE_API_KEY")
+    GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
 
 
 @lru_cache()

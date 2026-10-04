@@ -1,3 +1,4 @@
+from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -5,10 +6,14 @@ from backend.core.config import get_settings
 
 settings = get_settings()
 
+BACKEND_DIR = Path(__file__).resolve().parent.parent.parent.parent
+SQLITE_CANONICAL_PATH = (BACKEND_DIR / "prism.db").resolve()
+
 db_url = settings.DATABASE_URL
 connect_args = {}
 if db_url.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
+    db_url = f"sqlite:///{SQLITE_CANONICAL_PATH}"
 
 try:
     engine = create_engine(db_url, connect_args=connect_args)
@@ -16,7 +21,7 @@ try:
         with engine.connect() as conn:
             pass
 except Exception:
-    db_url = "sqlite:///./prism.db"
+    db_url = f"sqlite:///{SQLITE_CANONICAL_PATH}"
     connect_args = {"check_same_thread": False}
     engine = create_engine(db_url, connect_args=connect_args)
 
