@@ -2,10 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
-from backend.modules.factcheck.schemas import CheckRequest, CheckResponse, FactCheckHistoryItem
+from backend.modules.factcheck.schemas import CheckRequest, CheckResponse, FactCheckHistoryItem, ClaimItem
 from backend.modules.factcheck.services import FactCheckService
 
-from fastapi.responses import JSONResponse
+import json
+import logging
+from fastapi.responses import JSONResponse, StreamingResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Fact Check"])
 
@@ -22,28 +26,62 @@ async def check_claim(request: CheckRequest, db: Session = Depends(get_db)):
         )
 
 
+@router.post("/check/stream")
+async def check_claim_stream(request: CheckRequest, db: Session = Depends(get_db)):
+    service = FactCheckService(db)
+
+    async def event_generator():
+        try:
+            async for event in service.process_check_stream(request):
+                yield f"data: {json.dumps(event)}\n\n"
+        except ValueError as e:
+            yield f"data: {json.dumps({'event': 'error', 'error': str(e)})}\n\n"
+        except Exception as e:
+            logger.exception("Error during check stream")
+            yield f"data: {json.dumps({'event': 'error', 'error': 'Internal server error occurred.'})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/claims", response_model=list[ClaimItem])
+def get_claims(limit: int = 50, db: Session = Depends(get_db)):
+    service = FactCheckService(db)
+    return service.get_claims(limit=limit)
+
 
 @router.get("/history", response_model=list[FactCheckHistoryItem])
 def get_history(limit: int = 50, db: Session = Depends(get_db)):
     service = FactCheckService(db)
-    records = service.get_history(limit=limit)
-    return [
-        FactCheckHistoryItem(
-            id=r.id,
-            source_url=r.source_url,
-            input_text=r.input_text,
-            detected_language=r.detected_language,
-            translated_text=r.translated_text,
-            fact_check_results=r.fact_check_results,
-            created_at=r.created_at.isoformat() if r.created_at else None,
-            thumbnail_url=(
-                r.response_payload.get("thumbnail_url")
-                if isinstance(r.response_payload, dict) and r.response_payload.get("thumbnail_url")
-                else (r.fact_check_results.get("thumbnail_url") if isinstance(r.fact_check_results, dict) else None)
-            ),
+    claims = service.get_claims(limit=limit)
+    items = []
+    for c in claims:
+        items.append(
+            FactCheckHistoryItem(
+                id=c["id"],
+                source_url=c["source_url"],
+                input_text=c["text"],
+                detected_language=c["detected_language"],
+                translated_text=c["translated_text"],
+                fact_check_results=c.get("fact_check_results") if isinstance(c.get("fact_check_results"), dict) else None,
+                created_at=c["created_at"],
+                thumbnail_url=c["thumbnail_url"],
+                state=c["state"],
+                score=c["score"],
+                source=c["source"],
+                claim=c["claim"],
+                author=c.get("author"),
+                publisher=c.get("publisher"),
+            )
         )
-        for r in records
-    ]
+    return items
 
 
 @router.get("/stats")
@@ -55,6 +93,9 @@ def get_stats(db: Session = Depends(get_db)):
     platforms = {"instagram": 0, "twitter": 0, "facebook": 0, "other": 0}
     languages = {}
     verdicts = {"false": 0, "misleading": 0, "verified": 0, "unverified": 0}
+
+    fast_path_count = 0
+    total_timings = []
 
     for r in records:
         url = (r.source_url or "").lower()
@@ -73,6 +114,18 @@ def get_stats(db: Session = Depends(get_db)):
         # Check response_payload state first
         payload = r.response_payload if isinstance(r.response_payload, dict) else {}
         state = payload.get("state")
+        source = payload.get("source")
+        if not source:
+            claims = (r.fact_check_results or {}).get("claims", []) if isinstance(r.fact_check_results, dict) else []
+            source = "known_factcheck" if claims else "llm_inferred"
+
+        if source == "known_factcheck":
+            fast_path_count += 1
+
+        timings = payload.get("timings") or payload.get("_timings")
+        if timings and isinstance(timings, dict) and "total" in timings and timings["total"] > 0:
+            total_timings.append(timings["total"])
+
         if state == "False":
             verdicts["false"] += 1
         elif state == "True":
@@ -93,10 +146,16 @@ def get_stats(db: Session = Depends(get_db)):
                 else:
                     verdicts["verified"] += 1
 
+    fast_path_rate = round((fast_path_count / total * 100), 1) if total > 0 else 0.0
+    avg_response_time = round(sum(total_timings) / len(total_timings), 1) if total_timings else None
+
     return {
         "total_checks": total,
         "platforms": platforms,
         "languages": languages,
         "verdicts": verdicts,
+        "fast_path_count": fast_path_count,
+        "fast_path_rate": fast_path_rate,
+        "avg_response_time": avg_response_time,
     }
 

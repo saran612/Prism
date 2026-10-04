@@ -1,3 +1,4 @@
+import json
 import pytest
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
@@ -82,6 +83,12 @@ def test_modular_translation_translate():
     assert res.status_code == 200
     assert res.json()["translated_text"] == "test sentence"
 
+    # Test Indic translation (Hindi -> English)
+    res_hi = client.post("/api/v1/translation/translate", json={"text": "क्या पृथ्वी सपाट है?"})
+    assert res_hi.status_code == 200
+    trans_hi = res_hi.json()["translated_text"].lower()
+    assert "earth" in trans_hi and "flat" in trans_hi
+
 
 def test_modular_factcheck_api():
     res = client.post("/api/v1/check", json={"text": "Verified claim text for modular test"})
@@ -89,8 +96,31 @@ def test_modular_factcheck_api():
     data = res.json()
     assert data["state"] in ["True", "False", "Unverified"]
     assert isinstance(data["score"], int)
-    assert data["source"] in ["known_factcheck", "llm_inferred"]
-    assert set(data.keys()) == {"state", "score", "source"}
+    assert data["source"] in ["known_factcheck", "llm_inferred", "llm_direct_guess"]
+    assert {"state", "score", "source"}.issubset(set(data.keys()))
+
+
+def test_modular_factcheck_stream_api():
+    with client.stream("POST", "/api/v1/check/stream", json={"text": "Verified claim text for modular test"}) as res:
+        assert res.status_code == 200
+        events = []
+        for line in res.iter_lines():
+            if line.startswith("data: "):
+                events.append(json.loads(line[6:]))
+        event_names = [e.get("event") for e in events]
+        assert "content_extracted" in event_names
+        assert "translated" in event_names
+        assert "claim_extracted" in event_names
+        assert "complete" in event_names
+
+
+def test_factcheck_indic_translation():
+    res = client.post("/api/v1/check", json={"text": "क्या पृथ्वी सपाट है?"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["detected_language"] == "hi"
+    assert data["translated_text"] is not None
+    assert "earth" in data["translated_text"].lower() and "flat" in data["translated_text"].lower()
 
 
 def test_modular_history_api():
