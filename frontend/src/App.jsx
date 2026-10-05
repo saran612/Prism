@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import Dashboard from './Dashboard';
+import VerifierSkeleton from './VerifierSkeleton';
 import { ROUTE_DEFINITIONS, matchRoute } from './routes/schema';
 import { NotFoundPage } from './routes/Router';
+
 
 const INDIC_LANG_MAP = {
   hi: { name: 'Hindi', native: 'हिन्दी' },
@@ -76,10 +78,12 @@ export default function App() {
   // Main Social Link State
   const [socialUrl, setSocialUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [streamStage, setStreamStage] = useState(0); // 0: init, 1: content extracted, 2: translated, 3: claim extracted, 4: fallback started, 5: complete
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [rawResponseJson, setRawResponseJson] = useState(null);
   const [viewMode, setViewMode] = useState('visual'); // 'visual' | 'json'
+  const [translating, setTranslating] = useState(false);
 
   // API Studio State
   const [apiCodeTab, setApiCodeTab] = useState('curl'); // 'curl' | 'python' | 'javascript'
@@ -123,7 +127,7 @@ export default function App() {
   const fetchHistory = async () => {
     setHistoryLoading(true);
     try {
-      const res = await fetch('/api/v1/history');
+      const res = await fetch('/api/v1/history?limit=50');
       if (res.ok) {
         const data = await res.json();
         setHistoryItems(data);
@@ -162,8 +166,9 @@ export default function App() {
   // Execute Verification API Call
   const handleVerifyLink = async (e) => {
     if (e) e.preventDefault();
-    if (!socialUrl.trim()) {
-      setError('Please provide a social media post URL (X/Twitter, Instagram, or Facebook).');
+    const raw = socialUrl.trim();
+    if (!raw) {
+      setError('Please provide a social media post URL or enter a claim statement to verify.');
       return;
     }
 
@@ -171,27 +176,196 @@ export default function App() {
     setResult(null);
     setRawResponseJson(null);
     setLoading(true);
+    setStreamStage(0);
 
     try {
-      const res = await fetch('/api/v1/check', {
+      let cleanInput = raw;
+      if (cleanInput.startsWith('x.com/') || cleanInput.startsWith('twitter.com/') || cleanInput.startsWith('instagram.com/') || cleanInput.startsWith('facebook.com/') || cleanInput.startsWith('fb.com/') || cleanInput.startsWith('www.')) {
+        cleanInput = `https://${cleanInput}`;
+      }
+      const isUrl = cleanInput.startsWith('http://') || cleanInput.startsWith('https://');
+      const payload = isUrl ? { url: cleanInput } : { text: cleanInput };
+
+      const res = await fetch('/api/v1/check/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: socialUrl.trim() })
+        body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
-      setRawResponseJson(data);
-
       if (!res.ok) {
-        throw new Error(data.error || data.detail || 'Could not verify social media post content.');
+        let errJson = null;
+        try {
+          errJson = await res.json();
+        } catch (_) {}
+        throw new Error(errJson?.error || errJson?.detail || 'Could not verify post content.');
       }
 
-      setResult(data);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // Retain incomplete line
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const jsonStr = trimmed.slice(5).trim();
+          if (!jsonStr) continue;
+
+          try {
+            const data = JSON.parse(jsonStr);
+            if (data.event === 'error') {
+              throw new Error(data.error || 'Verification pipeline encountered an error.');
+            }
+
+            if (data.event === 'content_extracted') {
+              setResult((prev) => ({
+                ...(prev || {}),
+                text: data.text,
+                input_text: data.input_text || data.text,
+                thumbnail_url: data.thumbnail_url,
+                platform: data.platform,
+                author: data.author,
+                source_url: data.source_url,
+              }));
+              setStreamStage(1);
+            } else if (data.event === 'translated') {
+              setResult((prev) => ({
+                ...(prev || {}),
+                detected_language: data.detected_language,
+                translated_text: data.translated_text,
+              }));
+              setStreamStage(2);
+            } else if (data.event === 'claim_extracted') {
+              setResult((prev) => ({
+                ...(prev || {}),
+                claim: data.claim,
+                extracted_claims: data.extracted_claims,
+              }));
+              setStreamStage(3);
+            } else if (data.event === 'fallback_started') {
+              setStreamStage(4);
+            } else if (data.event === 'complete') {
+              setResult((prev) => ({
+                ...(prev || {}),
+                ...data.result,
+                claim: data.result?.claim || prev?.claim || '',
+                extracted_claims: data.result?.extracted_claims || prev?.extracted_claims || [],
+              }));
+              setRawResponseJson(data.result);
+              setStreamStage(5);
+              setLoading(false);
+              fetchHistory();
+            }
+          } catch (parseErr) {
+            console.error('Error parsing SSE event chunk:', parseErr);
+          }
+        }
+      }
     } catch (err) {
       setError(err.message);
+      setLoading(false);
     } finally {
       setLoading(false);
     }
+  };
+
+  // On-demand manual or recovery translation
+  const handleManualTranslate = async () => {
+    if (!result) return;
+    const textToTranslate = result.text || result.input_text || '';
+    if (!textToTranslate) return;
+
+    setTranslating(true);
+    try {
+      const res = await fetch('/api/v1/translation/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: textToTranslate,
+          source_language: result.detected_language !== 'unknown' ? result.detected_language : undefined,
+          target_language: 'en'
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.translated_text) {
+          setResult((prev) => ({
+            ...prev,
+            translated_text: data.translated_text
+          }));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to translate:', err);
+    } finally {
+      setTranslating(false);
+    }
+  };
+
+  // Auto-translate on Verifier page if result is non-English but translation is missing or equals original text
+  useEffect(() => {
+    if (
+      result &&
+      !loading &&
+      result.detected_language &&
+      result.detected_language !== 'en' &&
+      result.detected_language !== 'unknown' &&
+      (!result.translated_text || result.translated_text === (result.text || result.input_text)) &&
+      !translating
+    ) {
+      handleManualTranslate();
+    }
+  }, [result?.text, result?.input_text, result?.translated_text, result?.detected_language, loading]);
+
+  // Unified inspector: Redirects to Verifier page with pre-populated, verified claim details
+  const handleInspectClaim = (item) => {
+    if (!item) return;
+
+    if (item.source_url) {
+      setSocialUrl(item.source_url);
+    } else {
+      setSocialUrl(item.text || item.input_text || item.claim || '');
+    }
+
+    const claimFindings = item.fact_check_results || {
+      claims: item.source === 'known_factcheck' && item.publisher ? [{
+        text: item.claim || item.text || item.input_text,
+        claimReview: [{
+          publisher: { name: item.publisher },
+          textualRating: item.state,
+          url: item.url || item.source_url
+        }]
+      }] : [],
+      evidence: Array.isArray(item.evidence) ? item.evidence : []
+    };
+
+    setResult({
+      id: item.id,
+      state: item.state || 'Unverified',
+      score: typeof item.score === 'number' ? item.score : 0,
+      source: item.source || 'llm_inferred',
+      text: item.text || item.input_text || item.claim || '',
+      input_text: item.input_text || item.text || item.claim || '',
+      claim: item.claim || item.text || item.input_text || '',
+      detected_language: item.detected_language || 'en',
+      translated_text: item.translated_text || item.text || item.input_text || '',
+      fact_check_results: claimFindings,
+      thumbnail_url: item.thumbnail_url || null,
+      author: item.author || null,
+      source_url: item.source_url || null
+    });
+
+    setStreamStage(5);
+    setLoading(false);
+    setError(null);
+    navigateTo('/verifier');
   };
 
   // Helper for Language Meta
@@ -213,25 +387,24 @@ export default function App() {
 
     // Direct 3-field schema: { state: "True"|"False"|"Unverified", score: 0-100, source: "known_factcheck"|"llm_inferred" }
     if (res.state) {
-      const srcName = res.source === 'known_factcheck' ? 'Google Fact Check Tools' : 'Reputable News RAG (LLM Inferred)';
       if (res.state === 'False') {
         return {
           label: `False (${res.score}%)`,
           type: 'false',
-          description: `Identified as false/debunked via ${srcName}. Confidence score: ${res.score}/100.`
+          description: res.claim || res.text || res.input_text || 'Identified as false.'
         };
       }
       if (res.state === 'True') {
         return {
           label: `True (${res.score}%)`,
           type: 'true',
-          description: `Verified as accurate via ${srcName}. Confidence score: ${res.score}/100.`
+          description: res.claim || res.text || res.input_text || 'Verified as accurate.'
         };
       }
       return {
         label: `Unverified (${res.score}%)`,
         type: 'unverified',
-        description: `Insufficient conclusive evidence found across ${srcName}. Confidence score: ${res.score}/100.`
+        description: res.claim || res.text || res.input_text || 'Insufficient conclusive evidence.'
       };
     }
 
@@ -465,6 +638,7 @@ console.log("Fact Check Results:", data.fact_check_results);`;
         {currentPath === '/' || currentPath === '/dashboard' ? (
           <Dashboard
             onNavigate={navigateTo}
+            onInspectClaim={handleInspectClaim}
             INDIC_LANG_MAP={INDIC_LANG_MAP}
             detectPlatformFromUrl={detectPlatformFromUrl}
           />
@@ -474,7 +648,7 @@ console.log("Fact Check Results:", data.fact_check_results);`;
           <>
         {/* TAB 1: SOCIAL LINK VERIFIER */}
         {activeTab === 'verifier' && (
-          <div className={`apple-fade-in apple-verifier-stage ${result ? 'has-results' : ''}`}>
+          <div className={`apple-settle-in apple-verifier-stage ${result || loading ? 'has-results' : ''}`}>
             {/* Apple Hero Header */}
             <header className="apple-hero">
               <h1 className="apple-hero-title">
@@ -502,20 +676,13 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                   </div>
 
                   <input
-                    type="url"
+                    type="text"
                     id="social-url-input"
                     className="apple-spotlight-input"
-                    placeholder="Paste X / Twitter, Instagram, or Facebook link..."
+                    placeholder="Paste social media URL or enter any claim statement..."
                     value={socialUrl}
                     onChange={(e) => setSocialUrl(e.target.value)}
                   />
-
-                  {detectedPlatform && (
-                    <div className={`apple-platform-pill-detected ${detectedPlatform.class}`}>
-                      <span>{detectedPlatform.icon}</span>
-                      <span>{detectedPlatform.name}</span>
-                    </div>
-                  )}
 
                   {socialUrl && (
                     <button
@@ -572,6 +739,7 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                       setResult(null);
                       setRawResponseJson(null);
                       setError(null);
+                      setStreamStage(0);
                     }}
                     id="btn-clear-all"
                   >
@@ -581,16 +749,24 @@ console.log("Fact Check Results:", data.fact_check_results);`;
               </form>
             </div>
 
-            {/* Results Inspection Surface */}
+            {/* Live Pipeline Telemetry Skeleton during check (only before first layer arrives) */}
+            {loading && !result && <VerifierSkeleton socialUrl={socialUrl} />}
+
+            {/* Results Inspection Surface (Loads progressively layer-by-layer) */}
             {result && (
-              <div className="apple-results apple-fade-in" id="results-display">
+              <div className="apple-results apple-settle-in" id="results-display">
+
                 {/* View Switcher: Visual vs Raw JSON */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontSize: '0.86rem', color: 'var(--apple-label-secondary)' }}>
-                    <span>Target URL: </span>
-                    <a href={socialUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--apple-blue)', textDecoration: 'underline' }}>
-                      {socialUrl}
-                    </a>
+                    {!result.source_url && (
+                      <>
+                        <span>Claim Text: </span>
+                        <span style={{ color: 'var(--apple-label-primary)', fontWeight: 600 }}>
+                          {result.input_text || result.text || socialUrl}
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   <div className="apple-segmented-container" style={{ padding: '2px' }}>
@@ -615,114 +791,193 @@ console.log("Fact Check Results:", data.fact_check_results);`;
 
                 {viewMode === 'visual' ? (
                   <>
-                    {/* Verdict Island */}
+                    {/* Apple Verdict Island Banner */}
                     {(() => {
+                      if (loading && !result.state) {
+                        return (
+                          <div className="apple-verdict-island analyzing apple-settle-in" style={{ marginBottom: '20px' }}>
+                            <div className="apple-verdict-info">
+                              <span className="apple-verdict-eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span className="prism-skeleton-pulse-dot" />
+                                PIPELINE IN PROGRESS
+                              </span>
+                              <div className="apple-verdict-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span>Analyzing Veracity...</span>
+                                <div className="prism-skeleton-mini-spinner" style={{ width: '16px', height: '16px', borderWidth: '2.5px' }} />
+                              </div>
+                              <div className="apple-verdict-desc">
+                                {result.claim || result.text || result.input_text || 'Evaluating factual accuracy against authoritative registries...'}
+                              </div>
+                            </div>
+                            <div className="apple-verdict-badge unverified" style={{ background: 'rgba(100, 210, 255, 0.15)', color: '#64d2ff', borderColor: 'rgba(100, 210, 255, 0.3)' }}>
+                              Analyzing...
+                            </div>
+                          </div>
+                        );
+                      }
+
                       const verdict = getVerdict(result);
                       return (
-                        <div className={`apple-verdict-island ${verdict.type}`}>
+                        <div className={`apple-verdict-island ${verdict.type}`} style={{ marginBottom: '20px' }}>
                           <div className="apple-verdict-info">
                             <span className="apple-verdict-eyebrow">
-                              {result.source === 'known_factcheck' ? 'Stage 1 • Google Fact Check Registry' : (result.source === 'llm_inferred' ? 'Stage 2 • Reputable News RAG Engine' : 'Verification Classification')}
+                              VERIFICATION VERDICT
                             </span>
                             <div className="apple-verdict-title">{verdict.label}</div>
-                            <div className="apple-verdict-desc">{verdict.description}</div>
+                            <div className="apple-verdict-desc">
+                              {result.claim || result.text || result.input_text || verdict.description}
+                            </div>
                           </div>
-
                           <div className={`apple-verdict-badge ${verdict.type}`}>
-                            <span>{result.state || verdict.label}</span>
+                            {result.state || 'Unverified'} • {result.score ?? 0}%
                           </div>
                         </div>
                       );
                     })()}
 
-                    {/* Social Post Extraction Details */}
-                    <div className="apple-post-card">
-                      <div className="apple-post-top">
-                        <div className="apple-post-author-box">
-                          <div className="apple-post-avatar">
-                            {detectedPlatform ? detectedPlatform.icon : '🔗'}
-                          </div>
-                          <div className="apple-post-meta-lines">
-                            <div className="apple-post-author">
-                              {result.author ? `@${result.author}` : (detectedPlatform ? detectedPlatform.name : 'Social Post Extraction')}
+                    {/* Social Post Extraction Details or Direct Input Card */}
+                    {result.source_url ? (
+                      <div className="apple-post-card">
+                        <div className="apple-post-top">
+                          <div className="apple-post-author-box">
+                            <div className="apple-post-avatar">
+                              {detectedPlatform ? detectedPlatform.icon : '🔗'}
                             </div>
-                            <div className="apple-post-id-tag">
-                              Extracted URL: {socialUrl}
+                            <div className="apple-post-meta-lines">
+                              <div className="apple-post-author">
+                                {result.author ? `@${result.author}` : (detectedPlatform ? detectedPlatform.name : 'Social Post Extraction')}
+                              </div>
+                              <div className="apple-post-id-tag">
+                                Extracted URL: {result.source_url}
+                              </div>
                             </div>
                           </div>
+
+                          <a
+                            href={result.source_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="apple-safari-link"
+                            style={{ fontSize: '0.82rem' }}
+                          >
+                            <span>Open Original Post</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                              <polyline points="15 3 21 3 21 9" />
+                              <line x1="10" y1="14" x2="21" y2="3" />
+                            </svg>
+                          </a>
                         </div>
 
-                        <a
-                          href={socialUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="apple-safari-link"
-                          style={{ fontSize: '0.82rem' }}
-                        >
-                          <span>Open Original Post</span>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                            <polyline points="15 3 21 3 21 9" />
-                            <line x1="10" y1="14" x2="21" y2="3" />
-                          </svg>
-                        </a>
+                        {result.thumbnail_url && (
+                          <div className="apple-post-media-preview">
+                            <img
+                              src={result.thumbnail_url}
+                              alt="Post Media Thumbnail"
+                              className="apple-post-thumbnail-img"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                e.currentTarget.parentElement.style.display = 'none';
+                              }}
+                            />
+                            <div className="apple-post-thumbnail-badge">
+                              <span>📸 Media Thumbnail</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-
-                      {result.thumbnail_url && (
-                        <div className="apple-post-media-preview">
-                          <img
-                            src={result.thumbnail_url}
-                            alt="Post Media Thumbnail"
-                            className="apple-post-thumbnail-img"
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              e.currentTarget.parentElement.style.display = 'none';
-                            }}
-                          />
-                          <div className="apple-post-thumbnail-badge">
-                            <span>📸 Media Thumbnail</span>
+                    ) : (
+                      <div className="apple-post-card" style={{ padding: '16px 20px' }}>
+                        <div className="apple-post-top">
+                          <div className="apple-post-author-box">
+                            <div className="apple-post-avatar" style={{ fontSize: '1.2rem' }}>
+                              💬
+                            </div>
+                            <div className="apple-post-meta-lines">
+                              <div className="apple-post-author">
+                                Direct Claim Analysis
+                              </div>
+                              <div className="apple-post-id-tag">
+                                Detected Language: {getLangMeta(result.detected_language).name} {getLangMeta(result.detected_language).native ? `(${getLangMeta(result.detected_language).native})` : ''}
+                              </div>
+                            </div>
                           </div>
+                          <span className="apple-pane-badge" style={{ background: 'rgba(255, 255, 255, 0.08)', color: 'var(--apple-label-secondary)' }}>
+                            Raw Text Input
+                          </span>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {/* Dual Pane Language & Translation */}
                     <div className="apple-dual-pane">
                       <div className="apple-pane">
                         <div className="apple-pane-header">
-                          <span>Extracted Social Caption</span>
+                          <span>{result.source_url ? 'Extracted Social Caption' : 'Original Claim Statement'}</span>
                           <span className="apple-pane-badge">
                             {getLangMeta(result.detected_language).native} ({getLangMeta(result.detected_language).name})
                           </span>
                         </div>
                         <div className="apple-pane-text">
-                          {result.text || 'No caption text was extracted.'}
+                          {result.text || result.input_text || 'No caption text was extracted.'}
                         </div>
                       </div>
 
                       <div className="apple-pane">
                         <div className="apple-pane-header">
-                          <span>Neural English Translation</span>
-                          <span className="apple-pane-badge" style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#fff', borderColor: 'rgba(255, 255, 255, 0.15)' }}>
-                            Standardized Query
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>Neural English Translation</span>
+                            {(translating || (loading && !result.translated_text)) && (
+                              <svg className="apple-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--apple-accent)' }}>
+                                <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="16" />
+                              </svg>
+                            )}
+                          </div>
                         </div>
                         <div className="apple-pane-text">
-                          {result.translated_text || result.text}
+                          {loading && !result.translated_text && (!result.detected_language || result.detected_language !== 'en') ? (
+                            <div className="prism-skeleton-text-block apple-settle-in" style={{ padding: '4px 0' }}>
+                              <div className="prism-skeleton-line prism-skeleton-shimmer" style={{ width: '96%', height: '14px', marginBottom: '10px' }} />
+                              <div className="prism-skeleton-line prism-skeleton-shimmer" style={{ width: '88%', height: '14px', marginBottom: '10px' }} />
+                              <div className="prism-skeleton-line prism-skeleton-shimmer" style={{ width: '60%', height: '14px' }} />
+                            </div>
+                          ) : translating ? (
+                            <span style={{ color: 'var(--apple-label-secondary)', fontStyle: 'italic' }}>
+                              Translating statement with Neural Indian Language engine...
+                            </span>
+                          ) : result.detected_language !== 'en' && (!result.translated_text || result.translated_text === (result.text || result.input_text)) ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              <span style={{ color: 'var(--apple-label-secondary)' }}>
+                                {result.translated_text || result.text || result.input_text}
+                              </span>
+                              <div>
+                                <button
+                                  type="button"
+                                  className="apple-btn-secondary"
+                                  onClick={handleManualTranslate}
+                                  style={{ fontSize: '0.78rem', padding: '6px 14px' }}
+                                >
+                                  🔄 Translate to English
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            result.translated_text || result.text || result.input_text
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    {/* Published Fact-Checks */}
-                    <div className="apple-card">
-                      <div className="apple-card-header">
-                        <div className="apple-card-title-group">
-                          <h2>Fact Check Findings & Reviews</h2>
-                          <p>Authoritative debunking records retrieved from Google Fact Check Tools.</p>
+                    {/* Published Fact-Checks (only when external fact check registry records exist) */}
+                    {result.fact_check_results?.claims && result.fact_check_results.claims.length > 0 && (
+                      <div className="apple-card" style={{ marginTop: '20px' }}>
+                        <div className="apple-card-header">
+                          <div className="apple-card-title-group">
+                            <h2 style={{ margin: 0 }}>Fact Check Findings & Reviews</h2>
+                            <p>Authoritative debunking records retrieved from Google Fact Check Tools.</p>
+                          </div>
                         </div>
-                      </div>
 
-                      {result.fact_check_results?.claims && result.fact_check_results.claims.length > 0 ? (
                         <div className="apple-findings-list">
                           {result.fact_check_results.claims.map((claim, idx) => {
                             const review = claim.claimReview?.[0];
@@ -783,43 +1038,64 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                             );
                           })}
                         </div>
-                      ) : result.source ? (
-                        <div style={{ padding: '24px 20px' }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--apple-label-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verification Source</span>
-                              <div style={{ fontSize: '1rem', fontWeight: 600, marginTop: '4px', color: 'var(--apple-label-primary)' }}>
-                                {result.source === 'known_factcheck' ? 'Google Fact Check Tools' : 'Reputable News RAG (LLM Inferred)'}
-                              </div>
-                            </div>
-                            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--apple-label-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Confidence Score</span>
-                              <div style={{ fontSize: '1rem', fontWeight: 600, marginTop: '4px', color: 'var(--apple-label-primary)' }}>
-                                {result.score} / 100
-                              </div>
-                            </div>
-                            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--apple-label-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Classification State</span>
-                              <div style={{ fontSize: '1rem', fontWeight: 600, marginTop: '4px', color: 'var(--apple-label-primary)' }}>
-                                {result.state}
-                              </div>
-                            </div>
+                      </div>
+                    )}
+
+                    {/* Fallback Evidence Sources (when web/news evidence was retrieved via Jina or DDG) */}
+                    {Array.isArray(result.fact_check_results?.evidence) && result.fact_check_results.evidence.length > 0 && (
+                      <div className="apple-card" style={{ marginTop: '20px' }}>
+                        <div className="apple-card-header">
+                          <div className="apple-card-title-group">
+                            <h2 style={{ margin: 0 }}>Evidence Retrieved ({result.fact_check_results.evidence.length})</h2>
+                            <p>Corroborating web and news articles retrieved via live search engine verification.</p>
                           </div>
                         </div>
-                      ) : (
-                        <div style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--apple-label-secondary)' }}>
-                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4, margin: '0 auto 12px auto' }}>
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="12" y1="8" x2="12" y2="12" />
-                            <line x1="12" y1="16" x2="12.01" y2="16" />
-                          </svg>
-                          <div style={{ fontWeight: 600, color: 'var(--apple-label-primary)' }}>No Published Fact Checks Found</div>
-                          <div style={{ fontSize: '0.82rem', marginTop: '4px' }}>
-                            This post statement has no indexed reviews in the Google Fact Check Tools database.
-                          </div>
+
+                        <div className="apple-findings-list">
+                          {result.fact_check_results.evidence.map((ev, idx) => (
+                            <div key={idx} className="apple-finding-card">
+                              <div className="apple-finding-top">
+                                <div className="apple-publisher-name">
+                                  🌐 {ev.domain || 'News Source'}
+                                </div>
+                                <span className="apple-rating-pill true" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+                                  Live Web Evidence
+                                </span>
+                              </div>
+
+                              <div className="apple-finding-body" style={{ fontSize: '0.98rem', fontWeight: 600, color: 'var(--apple-label-primary)' }}>
+                                {ev.title}
+                              </div>
+
+                              {ev.snippet && (
+                                <div style={{ fontSize: '0.88rem', color: 'var(--apple-label-secondary)', lineHeight: 1.5, marginTop: '6px' }}>
+                                  "{ev.snippet}"
+                                </div>
+                              )}
+
+                              <div className="apple-finding-footer">
+                                <span>Organic Search Result</span>
+                                {ev.url && (
+                                  <a
+                                    href={ev.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="apple-safari-link"
+                                  >
+                                    <span>Read Source Article</span>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                      <polyline points="15 3 21 3 21 9" />
+                                      <line x1="10" y1="14" x2="21" y2="3" />
+                                    </svg>
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="apple-card">
@@ -842,7 +1118,7 @@ console.log("Fact Check Results:", data.fact_check_results);`;
 
         {/* TAB 2: API CALL CONSOLE */}
         {activeTab === 'api-studio' && (
-          <div className="apple-fade-in">
+          <div className="apple-settle-in apple-api-studio-view">
             <div className="apple-card">
               <div className="apple-card-header">
                 <div className="apple-card-title-group">
@@ -1003,7 +1279,7 @@ console.log("Fact Check Results:", data.fact_check_results);`;
 
         {/* TAB 3: AUDIT HISTORY */}
         {activeTab === 'history' && (
-          <div className="apple-fade-in">
+          <div className="apple-settle-in apple-history-view">
             <div className="apple-card">
               <div className="apple-card-header">
                 <div className="apple-card-title-group">
@@ -1048,15 +1324,28 @@ console.log("Fact Check Results:", data.fact_check_results);`;
               </div>
 
               {historyLoading ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--apple-label-secondary)' }}>
-                  Loading verification archive...
+                <div className="apple-history-list apple-settle-in">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="apple-history-item prism-skeleton-history-row" style={{ pointerEvents: 'none' }}>
+                      <div className="prism-skeleton-thumb prism-skeleton-shimmer" style={{ width: '48px', height: '48px', borderRadius: '8px', flexShrink: 0 }} />
+                      <div className="apple-history-content" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                        <div className="prism-skeleton-line prism-skeleton-shimmer" style={{ width: `${65 + ((i * 11) % 30)}%`, height: '15px' }} />
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <div className="prism-skeleton-pill prism-skeleton-shimmer" style={{ width: '80px', height: '18px' }} />
+                          <div className="prism-skeleton-pill prism-skeleton-shimmer" style={{ width: '65px', height: '18px' }} />
+                          <div className="prism-skeleton-pill prism-skeleton-shimmer" style={{ width: '38px', height: '18px' }} />
+                          <div className="prism-skeleton-line prism-skeleton-shimmer" style={{ width: '140px', height: '12px' }} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : historyItems.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--apple-label-secondary)' }}>
+                <div className="apple-settle-in" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--apple-label-secondary)' }}>
                   No historical social post verifications found yet. Execute an API verification above to record it.
                 </div>
               ) : (
-                <div className="apple-history-list">
+                <div className="apple-history-list apple-settle-in">
                   {historyItems
                     .filter((item) => {
                       if (historyPlatform !== 'all') {
@@ -1078,18 +1367,7 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                         <div
                           key={item.id}
                           className="apple-history-item"
-                          onClick={() => {
-                            if (item.source_url) setSocialUrl(item.source_url);
-                            setResult({
-                              text: item.input_text,
-                              detected_language: item.detected_language || 'en',
-                              translated_text: item.translated_text || item.input_text,
-                              fact_check_results: item.fact_check_results || { claims: [] },
-                              thumbnail_url: item.thumbnail_url,
-                              author: item.author
-                            });
-                            navigateTo('/verifier');
-                          }}
+                          onClick={() => handleInspectClaim(item)}
                         >
                           {item.thumbnail_url && (
                             <img
@@ -1103,11 +1381,21 @@ console.log("Fact Check Results:", data.fact_check_results);`;
                             />
                           )}
                           <div className="apple-history-content">
-                            <div className="apple-history-text">{item.input_text}</div>
+                            <div className="apple-history-text">{item.claim || item.input_text}</div>
                             <div className="apple-history-meta">
                               {plat && (
                                 <span className={`apple-platform-pill-detected ${plat.class}`} style={{ padding: '2px 8px', fontSize: '0.7rem' }}>
                                   {plat.icon} {plat.name}
+                                </span>
+                              )}
+                              {item.state && (
+                                <span className={`prism-badge-tag ${item.state.toLowerCase()}`} style={{ padding: '2px 8px', fontSize: '0.7rem' }}>
+                                  {item.state}
+                                </span>
+                              )}
+                              {item.score !== undefined && item.score !== null && (
+                                <span className="prism-badge-score" style={{ fontSize: '0.7rem' }}>
+                                  {item.score}
                                 </span>
                               )}
                               <span className="apple-pane-badge" style={{ padding: '2px 7px', fontSize: '0.68rem' }}>
