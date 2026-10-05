@@ -157,7 +157,7 @@ export function NotFoundPage({ currentPath: propPath, onNavigate }) {
   });
 
   return (
-    <div className="apple-fade-in" style={{ padding: '60px 20px', textAlign: 'center', maxWidth: '640px', margin: '0 auto' }}>
+    <div className="apple-fade-in apple-settle-in" style={{ padding: '60px 20px', textAlign: 'center', maxWidth: '640px', margin: '0 auto' }}>
       <div className="apple-404-badge">404 ROUTE NOT FOUND</div>
       <h1 style={{ fontSize: '2.4rem', fontWeight: 800, margin: '16px 0 10px', letterSpacing: '-0.03em' }}>
         Lost in the Spectrum.

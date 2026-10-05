@@ -15,6 +15,14 @@ export default defineConfig({
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
+      '/claims': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/check': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
       '/docs': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,

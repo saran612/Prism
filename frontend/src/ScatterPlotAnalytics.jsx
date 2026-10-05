@@ -172,36 +172,74 @@ function calculateMedian(arr) {
   return sorted.length % 2 !== 0 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
-export default function ScatterPlotAnalytics({ customData = null }) {
-  const data = customData || STATIC_PRISM_CLAIMS;
+export default function ScatterPlotAnalytics({ customData = null, onSelectPoint = null, onInspectPoint = null }) {
   const [hoveredPoint, setHoveredPoint] = useState(null);
 
-  // Group by the 3 requested metrics: "True", "False", and "llm_inferred"
+  // Normalize real claims or fallback mock data
+  const data = useMemo(() => {
+    const rawList = customData && customData.length > 0 ? customData : STATIC_PRISM_CLAIMS;
+    return rawList.map((item, idx) => {
+      const evCount = Array.isArray(item.evidence)
+        ? Math.max(1, item.evidence.length)
+        : typeof item.evidence === 'number'
+        ? Math.max(1, item.evidence)
+        : 1;
+      const score = typeof item.score === 'number' ? item.score : 0;
+      const state = item.state || 'Unverified';
+      const source = item.source || 'llm_inferred';
+      const text = item.claim || item.text || item.input_text || 'Claim';
+
+      let metric = item.metric;
+      if (!metric) {
+        if (state === 'True') metric = 'True';
+        else if (state === 'False') metric = 'False';
+        else metric = 'llm_inferred';
+      }
+
+      return {
+        ...item,
+        id: item.id || `claim-${idx}`,
+        text,
+        score,
+        evidence: evCount,
+        metric,
+        state,
+        source
+      };
+    });
+  }, [customData]);
+
+  const handlePointClick = (pt) => {
+    if (onSelectPoint) onSelectPoint(pt);
+    if (onInspectPoint) onInspectPoint(pt);
+  };
+
+  // Group by the 3 metrics: "True", "False", and "llm_inferred" without conflicting buckets
   const groups = useMemo(() => {
-    const trues = data.filter((d) => d.metric === 'True' || (d.source === 'known_factcheck' && d.state === 'True'));
-    const falses = data.filter((d) => d.metric === 'False' || (d.source === 'known_factcheck' && d.state === 'False'));
-    const inferred = data.filter((d) => d.metric === 'llm_inferred' || d.source === 'llm_inferred');
+    const trues = data.filter((d) => d.state === 'True' || d.metric === 'True');
+    const falses = data.filter((d) => d.state === 'False' || d.metric === 'False');
+    const inferred = data.filter((d) => d.state !== 'True' && d.state !== 'False' && d.metric !== 'True' && d.metric !== 'False');
 
     return {
       trues: {
         label: 'True',
-        color: '#C2DD38', // Olive / Yellow-green matching reference
-        border: '#666666', // Neutral gray border
+        color: '#C2DD38', // Olive / Yellow-green
+        border: '#666666',
         items: trues,
         medianScore: calculateMedian(trues.map((d) => d.score)),
         count: trues.length
       },
       falses: {
         label: 'False',
-        color: '#7066E0', // Purple-blue matching reference
+        color: '#7066E0', // Purple-blue
         border: '#5245B8',
         items: falses,
         medianScore: calculateMedian(falses.map((d) => d.score)),
         count: falses.length
       },
       inferred: {
-        label: 'llm_inferred',
-        color: '#B0B0B0', // Light gray background category matching reference
+        label: 'llm_inferred / Evaluating',
+        color: '#B0B0B0', // Light gray background
         border: '#888888',
         items: inferred,
         medianScore: calculateMedian(inferred.map((d) => d.score)),
@@ -249,7 +287,7 @@ export default function ScatterPlotAnalytics({ customData = null }) {
   const medianY = getY(overallMedianScore);
 
   return (
-    <div className="prism-scatter-card">
+    <div className="prism-scatter-card apple-settle-in">
       {/* Reference Single-Line Monospace Title (Top-Left) */}
       <div className="prism-scatter-header">
         <div className="prism-scatter-title">
@@ -405,6 +443,8 @@ export default function ScatterPlotAnalytics({ customData = null }) {
                 strokeWidth={isHovered ? 1.5 : 0.8}
                 opacity={isHovered ? 1 : 0.62}
                 className="prism-scatter-dot"
+                style={{ cursor: 'pointer' }}
+                onClick={() => handlePointClick(pt)}
                 onMouseEnter={() => setHoveredPoint(pt)}
                 onMouseLeave={() => setHoveredPoint(null)}
               />
@@ -428,6 +468,8 @@ export default function ScatterPlotAnalytics({ customData = null }) {
                 strokeWidth={isHovered ? 1.8 : 1}
                 opacity={isHovered ? 1 : 0.85}
                 className="prism-scatter-dot"
+                style={{ cursor: 'pointer' }}
+                onClick={() => handlePointClick(pt)}
                 onMouseEnter={() => setHoveredPoint(pt)}
                 onMouseLeave={() => setHoveredPoint(null)}
               />
@@ -451,6 +493,8 @@ export default function ScatterPlotAnalytics({ customData = null }) {
                 strokeWidth={isHovered ? 2.2 : 1.6}
                 opacity={isHovered ? 1 : 0.95}
                 className="prism-scatter-dot"
+                style={{ cursor: 'pointer' }}
+                onClick={() => handlePointClick(pt)}
                 onMouseEnter={() => setHoveredPoint(pt)}
                 onMouseLeave={() => setHoveredPoint(null)}
               />
@@ -481,6 +525,9 @@ export default function ScatterPlotAnalytics({ customData = null }) {
             <div className="prism-tooltip-meta">
               <span>Evidence: <strong>{hoveredPoint.evidence} sources</strong></span>
               <span>Score: <strong>{hoveredPoint.score}/100</strong></span>
+            </div>
+            <div className="prism-tooltip-click-hint" style={{ fontSize: '0.68rem', color: '#64d2ff', marginTop: '6px', textAlign: 'center', fontWeight: '500' }}>
+              Click point to inspect in Verifier →
             </div>
           </div>
         )}
